@@ -1,6 +1,6 @@
 pragma circom 2.2.2;
 
-include "../../node_modules/circomlib/circuits/poseidon.circom";
+include "circomlib/circuits/poseidon.circom";
 
 // Derives nullifier = Poseidon(nullifier_preimage, secret, leaf_index)
 // Including leaf_index prevents reuse of the same secret+preimage across deposits
