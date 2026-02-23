@@ -1,6 +1,6 @@
 pragma circom 2.2.2;
 
-include "../../node_modules/circomlib/circuits/bitify.circom";
+include "circomlib/circuits/bitify.circom";
 
 // Proves that `value` fits in `n` bits (i.e., 0 <= value < 2^n)
 template RangeProof(n) {
