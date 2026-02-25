@@ -38,6 +38,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# Ensure common global bin dirs are in PATH (bun, npm, yarn globals)
+export PATH="$HOME/.bun/bin:$HOME/.local/bin:/usr/local/bin:$PATH"
+
 CIRCUITS_BUILD="$ROOT/circuits/build"
 SETUP_DIR="$ROOT/circuits/trusted_setup"
 SRC_DIR="$ROOT/src"
@@ -45,7 +48,7 @@ SRC_DIR="$ROOT/src"
 PTAU_FILE="$SETUP_DIR/powersOfTau28_hez_final_15.ptau"
 PTAU_URL="https://hermez.s3-eu-west-1.amazonaws.com/powersOfTau28_hez_final_15.ptau"
 # Hermez ptau SHA-256 (publicly verifiable):
-PTAU_SHA256="d87a5df4f4d8ccf87f4fb5e28f0ab499a1c4dd22bd1e19bad9267f6afa48bbf8"
+PTAU_SHA256="77c5e5c9320764bc3ee17032c171f9851e37bd3587e057ec6ca70468fc108deb"
 
 CIRCUITS=("transfer" "withdraw")
 
@@ -82,9 +85,9 @@ need_step() {
 
 run_snarkjs() {
   if $VERBOSE; then
-    npx snarkjs "$@"
+    $SNARKJS "$@"
   else
-    npx snarkjs "$@" 2>&1 | tail -5
+    $SNARKJS "$@" 2>&1 | tail -5
   fi
 }
 
@@ -110,15 +113,18 @@ verify_sha256() {
 
 log "Pre-flight checks"
 
-command -v node &>/dev/null  || die "node not found. Install Node.js >= 18."
-command -v npx  &>/dev/null  || die "npx not found. Install Node.js >= 18."
+command -v node &>/dev/null || die "node not found. Install Node.js >= 18."
 
-# Check snarkjs
-if ! npx snarkjs --version &>/dev/null; then
-  die "snarkjs not found. Run: npm install -g snarkjs OR add to local package.json."
+# Resolve snarkjs — prefer direct binary (bun/npm global), fall back to npx
+if command -v snarkjs &>/dev/null; then
+  SNARKJS="snarkjs"
+elif command -v npx &>/dev/null && npx --yes snarkjs --version &>/dev/null 2>&1; then
+  SNARKJS="npx snarkjs"
+else
+  die "snarkjs not found.\n  Install via: bun i -g snarkjs  OR  npm install -g snarkjs"
 fi
-SNARKJS_VER=$(npx snarkjs --version 2>&1 | head -1)
-ok "snarkjs $SNARKJS_VER"
+SNARKJS_VER=$($SNARKJS 2>&1 | grep -i "snarkjs@" | head -1 || echo "snarkjs (version unknown)")
+ok "$SNARKJS_VER (cmd: $SNARKJS)"
 
 # Check build artifacts exist
 for circuit in "${CIRCUITS[@]}"; do
@@ -189,7 +195,7 @@ for circuit in "${CIRCUITS[@]}"; do
       ENTROPY="zktoken-dev-setup-$(date +%s)-$$"
       warn "Using timestamp entropy (dev only — NOT suitable for production)"
     fi
-    echo "$ENTROPY" | npx snarkjs zkey contribute \
+    echo "$ENTROPY" | $SNARKJS zkey contribute \
       "$ZKEY_0" "$ZKEY_FINAL" \
       --name="zktoken-dev-${circuit}-$(date +%Y%m%d)" \
       -v 2>&1 | (grep -E "(contribution|hash|reading)" || true)
@@ -200,7 +206,7 @@ for circuit in "${CIRCUITS[@]}"; do
 
   # --- 2c. Verify the final zkey is well-formed ----------------------------
   log "  Verifying ${circuit}_final.zkey..."
-  npx snarkjs zkey verify "$R1CS" "$PTAU_FILE" "$ZKEY_FINAL" \
+  $SNARKJS zkey verify "$R1CS" "$PTAU_FILE" "$ZKEY_FINAL" \
     2>&1 | grep -E "^(ZKey Ok|ZKey ERROR|snarkJS)" | head -3
   ok "  ${circuit}_final.zkey verified"
 
@@ -230,7 +236,7 @@ for circuit in "${CIRCUITS[@]}"; do
 
   if need_step "$SOL_FILE"; then
     log "  Exporting ${circuit} → $SOL_FILE"
-    npx snarkjs zkey export solidityverifier "$ZKEY_FINAL" "$SOL_FILE"
+    $SNARKJS zkey export solidityverifier "$ZKEY_FINAL" "$SOL_FILE"
 
     # Patch the auto-generated pragma to match our foundry.toml Solidity 0.8.24
     sed -i.bak 's/pragma solidity .*/pragma solidity ^0.8.20;/' "$SOL_FILE" && rm -f "${SOL_FILE}.bak"
