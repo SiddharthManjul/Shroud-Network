@@ -3,69 +3,74 @@ pragma solidity ^0.8.20;
 
 import {Script, console} from "forge-std/Script.sol";
 import {ShieldedPool} from "../src/ShieldedPool.sol";
+import {TestToken} from "../src/TestToken.sol";
 import {IVerifier} from "../src/interfaces/IVerifier.sol";
 
 /**
  * @title Deploy
  * @notice Foundry deployment script for the ZkToken ShieldedPool.
  *
- * Prerequisites before running:
- *   1. Deploy a Poseidon(2) contract (from poseidon-solidity or circomlibjs).
- *      Set POSEIDON_ADDRESS env var to its address.
- *   2. Set TOKEN_ADDRESS to the ERC20 token you want to wrap.
- *   3. Groth16VerifierTransfer and Groth16VerifierWithdraw are deployed
- *      by this script directly from the compiled artifacts.
+ * Environment variables (from .env):
+ *   DEPLOYER_PRIVATE_KEY  — required
+ *   TOKEN_ADDRESS          — ERC20 to wrap. If empty/zero, deploys TestToken.
+ *   POSEIDON_ADDRESS       — Deployed Poseidon(2). If empty/zero, deploys from bytecode.
+ *   SNOWTRACE_API_KEY      — for --verify on Fuji/mainnet
  *
  * Usage:
- *   # Local anvil (for testing)
+ *   # Local anvil
  *   forge script script/Deploy.s.sol --rpc-url anvil --broadcast
  *
  *   # Fuji testnet
- *   forge script script/Deploy.s.sol \
- *     --rpc-url fuji \
- *     --private-key $DEPLOYER_PRIVATE_KEY \
- *     --broadcast --verify
+ *   forge script script/Deploy.s.sol --rpc-url fuji --broadcast
  *
  *   # Avalanche mainnet
- *   forge script script/Deploy.s.sol \
- *     --rpc-url avalanche \
- *     --private-key $DEPLOYER_PRIVATE_KEY \
- *     --broadcast --verify
+ *   forge script script/Deploy.s.sol --rpc-url avalanche --broadcast --verify
  */
 contract Deploy is Script {
-    // ── Environment variables ────────────────────────────────────────────────
-    // Required
     address private constant SENTINEL = address(0);
 
     function run() external {
-        // Read deployment parameters from environment
-        address tokenAddress = vm.envAddress("TOKEN_ADDRESS");
-        address poseidonAddress = vm.envOr("POSEIDON_ADDRESS", SENTINEL);
-
-        require(tokenAddress != address(0), "Deploy: TOKEN_ADDRESS not set");
-
         uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
         address deployer = vm.addr(deployerKey);
 
+        // Read optional addresses — default to zero (auto-deploy)
+        address tokenAddress = vm.envOr("TOKEN_ADDRESS", SENTINEL);
+        address poseidonAddress = vm.envOr("POSEIDON_ADDRESS", SENTINEL);
+
         console.log("=== ZkToken ShieldedPool Deployment ===");
         console.log("Deployer      :", deployer);
-        console.log("Token         :", tokenAddress);
-        console.log("Poseidon      :", poseidonAddress);
         console.log("Chain ID      :", block.chainid);
 
         vm.startBroadcast(deployerKey);
 
-        // ── 1. Deploy transfer verifier ──────────────────────────────────────
-        // The verifier bytecode is embedded at compile time from the artifact.
-        // We deploy it inline so there is one tx per verifier.
+        // ── 1. Token ────────────────────────────────────────────────────────
+        if (tokenAddress == SENTINEL) {
+            TestToken testToken = new TestToken();
+            tokenAddress = address(testToken);
+            console.log("TestToken deployed:", tokenAddress);
+
+            // Mint tokens to deployer for testing
+            testToken.faucet();
+            console.log("Minted 1000 SRD to deployer");
+        }
+        console.log("Token         :", tokenAddress);
+
+        // ── 2. Poseidon ─────────────────────────────────────────────────────
+        if (poseidonAddress == SENTINEL) {
+            poseidonAddress = _deployPoseidon();
+            console.log("Poseidon deployed:", poseidonAddress);
+        }
+        console.log("Poseidon      :", poseidonAddress);
+
+        // ── 3. Transfer verifier ────────────────────────────────────────────
         address transferVerifier = _deployTransferVerifier();
         console.log("TransferVerifier:", transferVerifier);
 
-        // ── 2. Deploy withdraw verifier ──────────────────────────────────────
+        // ── 4. Withdraw verifier ────────────────────────────────────────────
         address withdrawVerifier = _deployWithdrawVerifier();
         console.log("WithdrawVerifier:", withdrawVerifier);
 
-        // ── 3. Deploy ShieldedPool ──────────────────────────────────────────
+        // ── 5. ShieldedPool ─────────────────────────────────────────────────
         ShieldedPool pool = new ShieldedPool(
             tokenAddress,
             transferVerifier,
@@ -77,20 +82,30 @@ contract Deploy is Script {
 
         vm.stopBroadcast();
 
-        // ── Summary ──────────────────────────────────────────────────────────
+        // ── Summary ─────────────────────────────────────────────────────────
         console.log("");
         console.log("=== Deployment complete ===");
         console.log("Add to .env:");
+        console.log("  TOKEN_ADDRESS=", tokenAddress);
+        console.log("  POSEIDON_ADDRESS=", poseidonAddress);
         console.log("  SHIELDED_POOL_ADDRESS=", address(pool));
         console.log("  TRANSFER_VERIFIER_ADDRESS=", transferVerifier);
         console.log("  WITHDRAW_VERIFIER_ADDRESS=", withdrawVerifier);
     }
 
-    // ── Internal helpers ─────────────────────────────────────────────────────
+    // ── Internal helpers ────────────────────────────────────────────────────
+
+    function _deployPoseidon() internal returns (address addr) {
+        // Read pre-generated Poseidon(2) bytecode from circomlibjs.
+        // Generate with: node scripts/generate_poseidon.js
+        bytes memory bytecode = vm.readFileBinary("src/PoseidonBytecode.bin");
+        assembly {
+            addr := create(0, add(bytecode, 0x20), mload(bytecode))
+        }
+        require(addr != address(0), "Deploy: Poseidon deploy failed");
+    }
 
     function _deployTransferVerifier() internal returns (address addr) {
-        // Import the auto-generated verifier artifact.
-        // Foundry resolves this via the artifact + ABI in out/.
         bytes memory bytecode = type(contracts_src_Groth16VerifierTransfer)
             .creationCode;
         assembly {
@@ -110,8 +125,7 @@ contract Deploy is Script {
 }
 
 // ---------------------------------------------------------------------------
-// Shim interfaces — Foundry needs an importable name to resolve creationCode.
-// These are declared at file scope so no runtime overhead.
+// Shim imports — Foundry needs importable names to resolve creationCode.
 // ---------------------------------------------------------------------------
 
 import {
