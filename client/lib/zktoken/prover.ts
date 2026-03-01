@@ -57,14 +57,18 @@ function randomBytes31(): bigint {
   return BigInt("0x" + bytesToHex(bytes));
 }
 
-// ─── Baby Jubjub subgroup order ───────────────────────────────────────────────
-
-const L =
-  2736030358979909402780800718157159386076813972158567259200215660948447373041n;
-
-/** Modular reduction within the Baby Jubjub subgroup order. */
-function mod(a: bigint): bigint {
-  return ((a % L) + L) % L;
+/**
+ * Generate a random bigint in [0, max).
+ * Uses rejection sampling for uniform distribution.
+ */
+function randomBigIntBelow(max: bigint): bigint {
+  if (max <= 1n) return 0n;
+  const bytes = new Uint8Array(31);
+  while (true) {
+    crypto.getRandomValues(bytes);
+    const val = BigInt("0x" + bytesToHex(bytes));
+    if (val < max) return val;
+  }
 }
 
 // ─── Proof encoding ───────────────────────────────────────────────────────────
@@ -78,11 +82,11 @@ function mod(a: bigint): bigint {
 export function encodeProofForContract(proof: Groth16Proof): Uint8Array {
   const pA: [bigint, bigint] = [BigInt(proof.pi_a[0]!), BigInt(proof.pi_a[1]!)];
 
-  // snarkjs returns pB in Fq2 as [[x1, x2], [y1, y2]]
-  // Solidity expects [2][2] in the same order
+  // snarkjs returns pB in Fq2 as [[x0, x1], [y0, y1]]
+  // Solidity pairing precompile expects SWAPPED order: [[x1, x0], [y1, y0]]
   const pB: [[bigint, bigint], [bigint, bigint]] = [
-    [BigInt(proof.pi_b[0]![0]!), BigInt(proof.pi_b[0]![1]!)],
-    [BigInt(proof.pi_b[1]![0]!), BigInt(proof.pi_b[1]![1]!)],
+    [BigInt(proof.pi_b[0]![1]!), BigInt(proof.pi_b[0]![0]!)],
+    [BigInt(proof.pi_b[1]![1]!), BigInt(proof.pi_b[1]![0]!)],
   ];
 
   const pC: [bigint, bigint] = [BigInt(proof.pi_c[0]!), BigInt(proof.pi_c[1]!)];
@@ -153,8 +157,12 @@ export async function generateTransferProof(
   const changeAmount = inputNote.amount - transferAmount;
 
   // ── Generate output note secrets ────────────────────────────────────────────
-  const recipientBlinding = randomBytes31();
-  const changeBlinding = mod(inputNote.blinding - recipientBlinding); // conservation: sum = inputNote.blinding
+  // recipientBlinding must be < inputNote.blinding so subtraction is exact
+  // (no modular wrapping). The circuit checks blinding_in === out1 + out2 in
+  // the BN254 scalar field, so the integer sum must be exact — not reduced
+  // mod L (Baby Jubjub subgroup order) which differs from p (BN254 field).
+  const recipientBlinding = randomBigIntBelow(inputNote.blinding);
+  const changeBlinding = inputNote.blinding - recipientBlinding;
 
   const secretOut1 = randomBytes31();
   const secretOut2 = randomBytes31();
@@ -208,8 +216,10 @@ export async function generateTransferProof(
     secret_out_2: secretOut2.toString(),
     nullifier_preimage_out_1: nullifierPreimageOut1.toString(),
     nullifier_preimage_out_2: nullifierPreimageOut2.toString(),
-    owner_pk_out_1: [recipientPublicKey[0].toString(), recipientPublicKey[1].toString()],
-    owner_pk_out_2: [senderPublicKey[0].toString(), senderPublicKey[1].toString()],
+    owner_pk_out_1_x: recipientPublicKey[0].toString(),
+    owner_pk_out_1_y: recipientPublicKey[1].toString(),
+    owner_pk_out_2_x: senderPublicKey[0].toString(),
+    owner_pk_out_2_y: senderPublicKey[1].toString(),
   };
 
   // ── Generate proof ──────────────────────────────────────────────────────────
@@ -321,8 +331,9 @@ export async function generateWithdrawProof(
   const changeAmount = inputNote.amount - withdrawAmount;
 
   // ── Generate change note (if partial) ─────────────────────────────────────
+  // The withdraw circuit enforces blinding_in === change_blinding (the
+  // withdrawn portion has zero blinding since its amount is public).
   let changeBlinding = 0n;
-  let withdrawBlinding = 0n;
   let secretOut = 0n;
   let nullifierPreimageOut = 0n;
   let changePedersen: BabyJubPoint = [0n, 0n];
@@ -330,8 +341,7 @@ export async function generateWithdrawProof(
   let changeNote: Note | undefined;
 
   if (!isFullWithdraw) {
-    withdrawBlinding = randomBytes31();
-    changeBlinding = mod(inputNote.blinding - withdrawBlinding);
+    changeBlinding = inputNote.blinding; // circuit: blinding_in === change_blinding
     secretOut = randomBytes31();
     nullifierPreimageOut = randomBytes31();
 
@@ -358,9 +368,9 @@ export async function generateWithdrawProof(
       createdAtBlock: 0,
     };
   } else {
-    // Full withdrawal: blinding splits as inputNote.blinding + 0
-    withdrawBlinding = inputNote.blinding;
-    changeBlinding = 0n;
+    // Full withdrawal: change_blinding = blinding_in (circuit constraint),
+    // but change_amount = 0 so the change commitment is trivial.
+    changeBlinding = inputNote.blinding;
   }
 
   // ── Build witness ───────────────────────────────────────────────────────────
@@ -383,15 +393,12 @@ export async function generateWithdrawProof(
     merkle_path: merklePath.pathElements.map((e) => e.toString()),
     path_indices: merklePath.pathIndices.map((i) => i.toString()),
 
-    // Withdrawal specific
-    withdraw_amount: withdrawAmount.toString(),
-    withdraw_blinding: withdrawBlinding.toString(),
+    // Change note
     change_amount: changeAmount.toString(),
     change_blinding: changeBlinding.toString(),
-    secret_out: secretOut.toString(),
-    nullifier_preimage_out: nullifierPreimageOut.toString(),
-    owner_pk_out: [senderPublicKey[0].toString(), senderPublicKey[1].toString()],
-    recipient: BigInt(recipient).toString(), // recipient as uint160 field element
+    secret_change: secretOut.toString(),
+    nullifier_preimage_change: nullifierPreimageOut.toString(),
+    owner_pk_change_x: senderPublicKey[0].toString(),
   };
 
   // ── Generate proof ──────────────────────────────────────────────────────────
