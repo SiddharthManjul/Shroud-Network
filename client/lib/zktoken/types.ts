@@ -228,40 +228,10 @@ export interface EthersLog {
   transactionHash: string;
 }
 
-// ─── ShieldedPool ABI ─────────────────────────────────────────────────────────
+// ─── ABIs ────────────────────────────────────────────────────────────────────
+// Full JSON ABIs live in ./abi/. Re-exported here for backwards compatibility.
 
-/** Minimal ABI fragments needed by the SDK. */
-export const SHIELDED_POOL_ABI = [
-  // deposit(uint256 amount, uint256 commitment)
-  "function deposit(uint256 amount, uint256 commitment) external",
-
-  // transfer(bytes proof, uint256 merkleRoot, uint256 nullifierHash,
-  //          uint256 newCommitment1, uint256 newCommitment2,
-  //          bytes encryptedMemo1, bytes encryptedMemo2)
-  "function transfer(bytes calldata proof, uint256 merkleRoot, uint256 nullifierHash, uint256 newCommitment1, uint256 newCommitment2, bytes calldata encryptedMemo1, bytes calldata encryptedMemo2) external",
-
-  // withdraw(bytes proof, uint256 merkleRoot, uint256 nullifierHash,
-  //          uint256 amount, uint256 changeCommitment,
-  //          address recipient, bytes encryptedMemo)
-  "function withdraw(bytes calldata proof, uint256 merkleRoot, uint256 nullifierHash, uint256 amount, uint256 changeCommitment, address recipient, bytes calldata encryptedMemo) external",
-
-  // View functions
-  "function getRoot() external view returns (uint256)",
-  "function getNextLeafIndex() external view returns (uint32)",
-  "function isSpent(uint256 nullifierHash) external view returns (bool)",
-  "function isKnownRoot(uint256 root) external view returns (bool)",
-
-  // Events
-  "event Deposit(uint256 indexed commitment, uint32 leafIndex, uint256 timestamp)",
-  "event PrivateTransfer(uint256 nullifierHash, uint256 commitment1, uint256 commitment2, bytes encryptedMemo1, bytes encryptedMemo2)",
-  "event Withdrawal(uint256 nullifierHash, address indexed recipient, uint256 amount, uint256 changeCommitment, bytes encryptedMemo)",
-] as const;
-
-/** Minimal ERC20 ABI for approve/allowance. */
-export const ERC20_ABI = [
-  "function approve(address spender, uint256 amount) external returns (bool)",
-  "function allowance(address owner, address spender) external view returns (uint256)",
-  "function balanceOf(address account) external view returns (uint256)",
-  "function decimals() external view returns (uint8)",
-  "function symbol() external view returns (string)",
-] as const;
+export { SHIELDED_POOL_ABI } from "./abi/shielded-pool";
+export { TEST_TOKEN_ABI } from "./abi/test-token";
+export { TRANSFER_VERIFIER_ABI } from "./abi/transfer-verifier";
+export { WITHDRAW_VERIFIER_ABI } from "./abi/withdraw-verifier";
