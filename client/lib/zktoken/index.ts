@@ -24,7 +24,10 @@ export type {
   EthersProvider,
   EthersTransactionResponse,
 } from "./types";
-export { SHIELDED_POOL_ABI, ERC20_ABI } from "./types";
+export { SHIELDED_POOL_ABI } from "./abi/shielded-pool";
+export { TEST_TOKEN_ABI } from "./abi/test-token";
+export { TRANSFER_VERIFIER_ABI } from "./abi/transfer-verifier";
+export { WITHDRAW_VERIFIER_ABI } from "./abi/withdraw-verifier";
 
 // KeyManager
 export { KeyManager, SUBGROUP_ORDER } from "./keys";
