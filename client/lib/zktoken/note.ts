@@ -64,8 +64,9 @@ export async function computePedersenCommitment(
   const babyJub = await getBabyJub();
   const F = babyJub.F;
 
-  // G contribution: amount * Base8
-  const G = babyJub.Base8;
+  // G contribution: amount * Generator
+  // IMPORTANT: Must use Generator (not Base8) to match the circuit's pedersen.circom
+  const G = babyJub.Generator;
   const gPart = babyJub.mulPointEscalar(G, amount);
 
   // H contribution: blinding * H
