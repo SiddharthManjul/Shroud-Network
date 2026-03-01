@@ -155,12 +155,21 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       if (address) connect();
     };
 
-    eth.on("accountsChanged", handleAccountsChanged);
-    eth.on("chainChanged", handleChainChanged);
+    try {
+      eth.on("accountsChanged", handleAccountsChanged);
+      eth.on("chainChanged", handleChainChanged);
+    } catch {
+      // Provider doesn't support event listeners (e.g. MetaMask proxy)
+      return;
+    }
 
     return () => {
-      eth.removeListener("accountsChanged", handleAccountsChanged);
-      eth.removeListener("chainChanged", handleChainChanged);
+      try {
+        eth.removeListener("accountsChanged", handleAccountsChanged);
+        eth.removeListener("chainChanged", handleChainChanged);
+      } catch {
+        // ignore
+      }
     };
   }, [address, connect, disconnect]);
 
