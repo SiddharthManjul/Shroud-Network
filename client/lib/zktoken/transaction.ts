@@ -15,14 +15,14 @@
 
 import { Interface, getAddress } from "ethers";
 import {
-  SHIELDED_POOL_ABI,
-  ERC20_ABI,
   type DepositParams,
   type TransferParams,
   type WithdrawParams,
   type EthersTransactionResponse,
   type Note,
 } from "./types";
+import { SHIELDED_POOL_ABI } from "./abi/shielded-pool";
+import { TEST_TOKEN_ABI } from "./abi/test-token";
 import { createNote, finaliseNote } from "./note";
 import { MerkleTreeSync } from "./merkle";
 import {
@@ -37,10 +37,15 @@ import { bytesToHex } from "./utils";
 /**
  * Deposit ERC20 tokens into the shielded pool.
  *
+ * `amount` is in whole token units (e.g. 500 = 500 SRD). The note stores
+ * this value directly (must fit in uint64 for circuit range proofs).
+ * The ERC20 approve/transferFrom and contract deposit use the scaled
+ * amount (amount * 10^18) since the token has 18 decimals.
+ *
  * Steps:
- *   1. Create a new Note (amount, ownerPublicKey)
- *   2. Approve the pool contract to spend `amount` of tokens
- *   3. Call ShieldedPool.deposit(amount, noteCommitment)
+ *   1. Create a new Note (amount in whole tokens)
+ *   2. Approve the pool contract to spend the scaled ERC20 amount
+ *   3. Call ShieldedPool.deposit(scaledAmount, noteCommitment)
  *   4. Return the pending note (leafIndex = -1 until tx confirmed)
  *
  * The caller should listen for the Deposit event to obtain the leafIndex
@@ -54,14 +59,17 @@ export async function deposit(
   if (amount <= 0n) throw new Error("deposit: amount must be > 0");
   if (!signer.provider) throw new Error("deposit: signer has no provider");
 
-  // 1. Create a new note
+  // Note stores whole token amount (fits in uint64 for circuit range proofs)
   const pendingNote = await createNote(amount, ownerPublicKey, tokenAddress);
 
+  // ERC20 uses 18 decimals
+  const scaledAmount = amount * 10n ** 18n;
+
   // 2. Approve token transfer
-  const erc20Iface = new Interface(ERC20_ABI);
+  const erc20Iface = new Interface(TEST_TOKEN_ABI);
   const approveData = erc20Iface.encodeFunctionData("approve", [
     poolAddress,
-    amount,
+    scaledAmount,
   ]);
   const approveTx = await signer.sendTransaction({
     to: tokenAddress,
@@ -72,7 +80,7 @@ export async function deposit(
   // 3. Deposit into pool
   const poolIface = new Interface(SHIELDED_POOL_ABI);
   const depositData = poolIface.encodeFunctionData("deposit", [
-    amount,
+    scaledAmount,
     pendingNote.noteCommitment,
   ]);
   const tx = await signer.sendTransaction({
