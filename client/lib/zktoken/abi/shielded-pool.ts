@@ -350,4 +350,4 @@ export const SHIELDED_POOL_ABI = [
     "stateMutability": "view",
     "type": "function"
   }
-]
+] as const;
