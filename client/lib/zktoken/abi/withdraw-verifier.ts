@@ -33,4 +33,4 @@ export const WITHDRAW_VERIFIER_ABI = [
     "stateMutability": "view",
     "type": "function"
   }
-]
+] as const;
