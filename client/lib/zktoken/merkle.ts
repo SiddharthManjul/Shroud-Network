@@ -19,11 +19,17 @@
 import { getPoseidon } from "./crypto";
 import type { EthersProvider, MerklePath } from "./types";
 import { AbiCoder, Interface } from "ethers";
-import { SHIELDED_POOL_ABI } from "./types";
+import { SHIELDED_POOL_ABI } from "./abi/shielded-pool";
 
 // ─── Tree constants ───────────────────────────────────────────────────────────
 
 export const TREE_DEPTH = 20;
+
+/** ShieldedPool deployment block on Fuji — skip scanning older blocks. */
+const DEPLOY_BLOCK = 52250867;
+
+/** Max block range per getLogs request (Avalanche RPCs cap at 2048). */
+const LOG_CHUNK_SIZE = 2048;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function poseidonHash2(poseidon: any, l: bigint, r: bigint): bigint {
@@ -178,17 +184,17 @@ export class MerkleTreeSync {
    *   PrivateTransfer     → insert(commitment1), insert(commitment2)
    *   Withdrawal          → insert(changeCommitment) only if changeCommitment ≠ 0
    *
-   * All events are fetched in block order.  Pass `fromBlock` to skip already-
-   * processed blocks (incremental sync).
+   * All events are fetched in block order, chunked to stay within RPC limits
+   * (most providers cap at 2048 blocks per getLogs request).
    *
    * @param provider    ethers Provider.
    * @param poolAddress ShieldedPool contract address.
-   * @param fromBlock   First block to scan (default = 0).
+   * @param fromBlock   First block to scan (defaults to contract deployment block).
    */
   async syncFromChain(
     provider: EthersProvider,
     poolAddress: string,
-    fromBlock = 0
+    fromBlock = DEPLOY_BLOCK
   ): Promise<void> {
     await this.init();
 
@@ -197,18 +203,30 @@ export class MerkleTreeSync {
     const depositTopic = iface.getEvent("Deposit")!.topicHash;
     const transferTopic = iface.getEvent("PrivateTransfer")!.topicHash;
     const withdrawalTopic = iface.getEvent("Withdrawal")!.topicHash;
+    const topics = [[depositTopic, transferTopic, withdrawalTopic]];
 
-    const logs = await provider.getLogs({
-      address: poolAddress,
-      topics: [[depositTopic, transferTopic, withdrawalTopic]],
-      fromBlock,
-      toBlock: "latest",
+    // Fetch logs in chunks to avoid RPC block range limits
+    const latestBlock = await provider.getBlockNumber();
+    const allLogs: { topics: string[]; data: string; blockNumber: number; transactionHash: string; logIndex?: number }[] = [];
+
+    for (let start = fromBlock; start <= latestBlock; start += LOG_CHUNK_SIZE) {
+      const end = Math.min(start + LOG_CHUNK_SIZE - 1, latestBlock);
+      const chunk = await provider.getLogs({
+        address: poolAddress,
+        topics,
+        fromBlock: start,
+        toBlock: end,
+      });
+      allLogs.push(...chunk);
+    }
+
+    // Sort by block number (and logIndex if available) to ensure correct insertion order
+    allLogs.sort((a, b) => {
+      if (a.blockNumber !== b.blockNumber) return a.blockNumber - b.blockNumber;
+      return (a.logIndex ?? 0) - (b.logIndex ?? 0);
     });
 
-    // Sort by block number to ensure correct insertion order
-    logs.sort((a, b) => a.blockNumber - b.blockNumber);
-
-    for (const log of logs) {
+    for (const log of allLogs) {
       const topic = log.topics[0];
       if (topic === depositTopic) {
         const parsed = iface.parseLog(log);
