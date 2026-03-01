@@ -58,6 +58,9 @@ export default function DashboardPage() {
           <p className="mt-1 text-lg font-medium text-white">
             {unspent.length} unspent
           </p>
+          <p className="mt-0.5 text-sm font-mono text-zinc-400">
+            {unspent.reduce((s, n) => s + n.amount, 0n).toString()} zkSRD
+          </p>
         </div>
       </div>
 
