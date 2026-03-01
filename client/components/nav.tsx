@@ -10,6 +10,7 @@ const links = [
   { href: "/transfer", label: "Transfer" },
   { href: "/withdraw", label: "Withdraw" },
   { href: "/notes", label: "Notes" },
+  { href: "/faucet", label: "Faucet" },
 ];
 
 export function Nav() {
