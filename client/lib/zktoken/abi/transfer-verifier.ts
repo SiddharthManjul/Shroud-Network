@@ -33,4 +33,4 @@ export const TRANSFER_VERIFIER_ABI = [
     "stateMutability": "view",
     "type": "function"
   }
-]
+] as const;
