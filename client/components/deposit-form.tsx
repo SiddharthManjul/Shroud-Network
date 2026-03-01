@@ -3,11 +3,17 @@
 import { useState } from "react";
 import { useWallet } from "@/hooks/use-wallet";
 import { useZkToken } from "@/hooks/use-zktoken";
+import { useNotes } from "@/hooks/use-notes";
+import { useShieldedKey } from "@/hooks/use-shielded-key";
+
+const POOL_ADDRESS = process.env.NEXT_PUBLIC_SHIELDED_POOL_ADDRESS ?? "";
+const TOKEN_ADDRESS = process.env.NEXT_PUBLIC_TOKEN_ADDRESS ?? "";
 
 export function DepositForm() {
   const { ready } = useZkToken();
-  const { address, signer } = useWallet();
-  const [tokenAddress, setTokenAddress] = useState("");
+  const { address, signer, provider } = useWallet();
+  const { saveNote } = useNotes();
+  const { keypair, deriving, deriveKey } = useShieldedKey();
   const [amount, setAmount] = useState("");
   const [status, setStatus] = useState<string | null>(null);
 
@@ -17,22 +23,36 @@ export function DepositForm() {
 
     setStatus("Preparing deposit...");
     try {
-      const { deposit } = await import("@/lib/zktoken/transaction");
-      const { KeyManager } = await import("@/lib/zktoken/keys");
+      // Ensure we have a shielded keypair
+      let kp = keypair;
+      if (!kp) {
+        setStatus("Sign the message in your wallet to derive your shielded key...");
+        kp = await deriveKey();
+        if (!kp) throw new Error("Failed to derive shielded key");
+      }
 
-      // Generate a keypair for this deposit (in production, use persistent key)
-      const keypair = await KeyManager.generate();
+      const { deposit, waitForDeposit } = await import("@/lib/zktoken/transaction");
 
-      const poolAddress = tokenAddress; // TODO: resolve pool from factory
+      setStatus("Approve the token transfer in your wallet...");
       const result = await deposit({
         signer: signer as never,
-        poolAddress,
-        tokenAddress,
+        poolAddress: POOL_ADDRESS,
+        tokenAddress: TOKEN_ADDRESS,
         amount: BigInt(amount),
-        ownerPublicKey: keypair.publicKey,
+        ownerPublicKey: kp.publicKey,
       });
 
-      setStatus(`Deposit submitted: ${result.tx.hash}`);
+      setStatus(`Deposit submitted: ${result.tx.hash}. Waiting for confirmation...`);
+
+      const finalizedNote = await waitForDeposit(
+        result.tx,
+        result.pendingNote,
+        provider! as never,
+        POOL_ADDRESS
+      );
+      saveNote(finalizedNote);
+
+      setStatus(`Deposit confirmed: ${result.tx.hash}`);
     } catch (err) {
       setStatus(`Error: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -42,28 +62,28 @@ export function DepositForm() {
     <form onSubmit={handleDeposit} className="space-y-4">
       <div>
         <label className="block text-sm font-medium text-zinc-400 mb-1">
-          Token Address
-        </label>
-        <input
-          type="text"
-          value={tokenAddress}
-          onChange={(e) => setTokenAddress(e.target.value)}
-          placeholder="0x..."
-          className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white placeholder:text-zinc-600 focus:border-indigo-500 focus:outline-none"
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-zinc-400 mb-1">
-          Amount
+          Amount (SRD)
         </label>
         <input
           type="text"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          placeholder="1000000"
+          placeholder="100"
           className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white placeholder:text-zinc-600 focus:border-indigo-500 focus:outline-none"
         />
       </div>
+
+      {!keypair && address && (
+        <button
+          type="button"
+          onClick={deriveKey}
+          disabled={deriving}
+          className="w-full rounded-lg bg-zinc-800 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50 transition-colors"
+        >
+          {deriving ? "Signing..." : "Derive Shielded Key (one-time)"}
+        </button>
+      )}
+
       <button
         type="submit"
         disabled={!ready || !address}
