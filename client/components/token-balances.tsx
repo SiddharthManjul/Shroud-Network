@@ -1,9 +1,10 @@
 "use client";
 
 import { useWallet } from "@/hooks/use-wallet";
+import { useNotes } from "@/hooks/use-notes";
 import { useEffect, useState } from "react";
 import { BrowserProvider, Contract, formatEther, formatUnits } from "ethers";
-import { ERC20_ABI } from "@/lib/zktoken/types";
+import { TEST_TOKEN_ABI } from "@/lib/zktoken/abi/test-token";
 
 interface TokenInfo {
   symbol: string;
@@ -14,6 +15,8 @@ interface TokenInfo {
 
 export function TokenBalances() {
   const { address, provider } = useWallet();
+  const { unspent } = useNotes();
+  const shieldedTotal = unspent.reduce((sum, n) => sum + n.amount, 0n);
   const [avaxBalance, setAvaxBalance] = useState<string | null>(null);
   const [tokenInfo, setTokenInfo] = useState<TokenInfo | null>(null);
   const [loading, setLoading] = useState(false);
@@ -37,7 +40,7 @@ export function TokenBalances() {
         // ERC20 token balance (if configured)
         const tokenAddr = process.env.NEXT_PUBLIC_TOKEN_ADDRESS;
         if (tokenAddr && tokenAddr.length > 0) {
-          const erc20 = new Contract(tokenAddr, ERC20_ABI, provider as unknown as BrowserProvider);
+          const erc20 = new Contract(tokenAddr, TEST_TOKEN_ABI, provider as unknown as BrowserProvider);
           const [balance, decimals, symbol] = await Promise.all([
             erc20.balanceOf(address),
             erc20.decimals(),
@@ -66,7 +69,7 @@ export function TokenBalances() {
   if (!address) return null;
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid gap-4 sm:grid-cols-3">
       {/* AVAX balance */}
       <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
         <p className="text-sm text-zinc-500">AVAX Balance</p>
@@ -100,6 +103,20 @@ export function TokenBalances() {
             {tokenInfo.address}
           </p>
         )}
+      </div>
+
+      {/* Shielded balance */}
+      <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+        <p className="text-sm text-zinc-500">Shielded SRD</p>
+        <p className="mt-1 text-lg font-medium text-white font-mono">
+          {shieldedTotal > 0n
+            ? `${shieldedTotal.toString()} zkSRD`
+            : <span className="text-zinc-600">0 zkSRD</span>
+          }
+        </p>
+        <p className="mt-0.5 text-xs text-zinc-600">
+          {unspent.length} unspent note{unspent.length !== 1 ? "s" : ""}
+        </p>
       </div>
     </div>
   );
