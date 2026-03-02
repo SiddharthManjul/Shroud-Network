@@ -9,6 +9,15 @@ import { useShieldedKey } from "@/hooks/use-shielded-key";
 const POOL_ADDRESS = process.env.NEXT_PUBLIC_SHIELDED_POOL_ADDRESS ?? "";
 const TOKEN_ADDRESS = process.env.NEXT_PUBLIC_TOKEN_ADDRESS ?? "";
 
+const inputClass =
+  "w-full rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] px-3 py-2 text-[#ff1a1a] placeholder:text-[#444444] focus:border-[#ff1a1a] focus:outline-none transition-colors duration-200";
+
+const btnPrimary =
+  "w-full rounded-lg bg-[#b0b0b0] px-4 py-2.5 font-medium text-black hover:bg-[#ff1a1a] hover:text-black border border-[#b0b0b0] hover:border-[#ff1a1a] disabled:opacity-40 transition-colors duration-200";
+
+const btnSecondary =
+  "w-full rounded-lg bg-[#b0b0b0] px-4 py-2 text-sm font-medium text-black hover:bg-[#ff1a1a] hover:text-black border border-[#b0b0b0] hover:border-[#ff1a1a] disabled:opacity-40 transition-colors duration-200";
+
 export function DepositForm() {
   const { ready } = useZkToken();
   const { address, signer, provider } = useWallet();
@@ -23,7 +32,6 @@ export function DepositForm() {
 
     setStatus("Preparing deposit...");
     try {
-      // Ensure we have a shielded keypair
       let kp = keypair;
       if (!kp) {
         setStatus("Sign the message in your wallet to derive your shielded key...");
@@ -61,7 +69,7 @@ export function DepositForm() {
   return (
     <form onSubmit={handleDeposit} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-zinc-400 mb-1">
+        <label className="block text-sm font-medium text-[#888888] mb-1">
           Amount (SRD)
         </label>
         <input
@@ -69,7 +77,7 @@ export function DepositForm() {
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           placeholder="100"
-          className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white placeholder:text-zinc-600 focus:border-indigo-500 focus:outline-none"
+          className={inputClass}
         />
       </div>
 
@@ -78,21 +86,18 @@ export function DepositForm() {
           type="button"
           onClick={deriveKey}
           disabled={deriving}
-          className="w-full rounded-lg bg-zinc-800 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50 transition-colors"
+          className={btnSecondary}
         >
           {deriving ? "Signing..." : "Derive Shielded Key (one-time)"}
         </button>
       )}
 
-      <button
-        type="submit"
-        disabled={!ready || !address}
-        className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors"
-      >
+      <button type="submit" disabled={!ready || !address} className={btnPrimary}>
         {!address ? "Connect wallet first" : !ready ? "Initializing..." : "Deposit"}
       </button>
+
       {status && (
-        <p className="text-sm text-zinc-400 break-all">{status}</p>
+        <p className="text-sm text-[#888888] break-all">{status}</p>
       )}
     </form>
   );

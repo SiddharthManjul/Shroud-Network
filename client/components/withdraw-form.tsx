@@ -5,6 +5,12 @@ import { useWallet } from "@/hooks/use-wallet";
 import { useZkToken } from "@/hooks/use-zktoken";
 import { ProofStatus } from "./proof-status";
 
+const inputClass =
+  "w-full rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] px-3 py-2 text-[#ff1a1a] placeholder:text-[#444444] focus:border-[#ff1a1a] focus:outline-none transition-colors duration-200";
+
+const btnPrimary =
+  "w-full rounded-lg bg-[#b0b0b0] px-4 py-2.5 font-medium text-black hover:bg-[#ff1a1a] hover:text-black border border-[#b0b0b0] hover:border-[#ff1a1a] disabled:opacity-40 transition-colors duration-200";
+
 export function WithdrawForm() {
   const { ready } = useZkToken();
   const { address } = useWallet();
@@ -20,7 +26,6 @@ export function WithdrawForm() {
     setGenerating(true);
     setStatus("Generating ZK proof...");
     try {
-      // In production: select note from NoteStore, generate proof, submit
       setStatus("Withdraw proof generation requires a selected note and pool connection.");
     } catch (err) {
       setStatus(`Error: ${err instanceof Error ? err.message : String(err)}`);
@@ -32,7 +37,7 @@ export function WithdrawForm() {
   return (
     <form onSubmit={handleWithdraw} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-zinc-400 mb-1">
+        <label className="block text-sm font-medium text-[#888888] mb-1">
           Recipient Address
         </label>
         <input
@@ -40,11 +45,11 @@ export function WithdrawForm() {
           value={recipient}
           onChange={(e) => setRecipient(e.target.value)}
           placeholder="0x..."
-          className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white placeholder:text-zinc-600 focus:border-indigo-500 focus:outline-none font-mono text-sm"
+          className={`${inputClass} font-mono text-sm`}
         />
       </div>
       <div>
-        <label className="block text-sm font-medium text-zinc-400 mb-1">
+        <label className="block text-sm font-medium text-[#888888] mb-1">
           Amount
         </label>
         <input
@@ -52,19 +57,25 @@ export function WithdrawForm() {
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           placeholder="500000"
-          className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white placeholder:text-zinc-600 focus:border-indigo-500 focus:outline-none"
+          className={inputClass}
         />
       </div>
       <ProofStatus generating={generating} />
       <button
         type="submit"
         disabled={!ready || !address || generating}
-        className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors"
+        className={btnPrimary}
       >
-        {!address ? "Connect wallet first" : !ready ? "Initializing..." : generating ? "Generating proof..." : "Withdraw"}
+        {!address
+          ? "Connect wallet first"
+          : !ready
+          ? "Initializing..."
+          : generating
+          ? "Generating proof..."
+          : "Withdraw"}
       </button>
       {status && (
-        <p className="text-sm text-zinc-400 break-all">{status}</p>
+        <p className="text-sm text-[#888888] break-all">{status}</p>
       )}
     </form>
   );
