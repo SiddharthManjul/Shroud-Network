@@ -4,8 +4,8 @@ export default function TransferPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Private Transfer</h1>
-        <p className="mt-1 text-zinc-400">
+        <h1 className="text-2xl font-bold text-[#ff1a1a]">Private Transfer</h1>
+        <p className="mt-1 text-[#888888]">
           Send tokens privately within the shielded pool. Amounts, senders, and
           receivers are hidden behind ZK proofs.
         </p>
