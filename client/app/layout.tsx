@@ -10,8 +10,9 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "ZkToken — Shielded Pool",
-  description: "Privacy-preserving token transfers on Avalanche C-Chain",
+  title: "Shroud Network — Private Token Transfers",
+  description:
+    "Zero-knowledge shielded token transfers on Avalanche. Shield your assets, transfer privately, and maintain full self-custody.",
 };
 
 export default function RootLayout({
