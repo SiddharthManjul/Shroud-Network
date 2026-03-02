@@ -10,8 +10,8 @@ export default function NotesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Notes</h1>
-          <p className="mt-1 text-zinc-400">
+          <h1 className="text-2xl font-bold text-[#ff1a1a]">Notes</h1>
+          <p className="mt-1 text-[#888888]">
             Your shielded note inventory. {unspent.length} unspent of{" "}
             {notes.length} total.
           </p>
@@ -19,7 +19,7 @@ export default function NotesPage() {
         {notes.length > 0 && (
           <button
             onClick={clearAll}
-            className="rounded-lg border border-red-500/30 px-3 py-1.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+            className="rounded-lg border border-[#ff1a1a]/30 px-3 py-1.5 text-sm text-[#ff1a1a]/80 hover:bg-[#ff1a1a]/10 transition-colors"
           >
             Clear All
           </button>
@@ -27,13 +27,13 @@ export default function NotesPage() {
       </div>
 
       <div>
-        <h2 className="text-lg font-semibold text-white mb-3">Unspent</h2>
+        <h2 className="text-lg font-semibold text-[#ff1a1a] mb-3">Unspent</h2>
         <NoteList notes={unspent} />
       </div>
 
       {notes.some((n) => n.spent) && (
         <div>
-          <h2 className="text-lg font-semibold text-white mb-3">Spent</h2>
+          <h2 className="text-lg font-semibold text-[#ff1a1a] mb-3">Spent</h2>
           <NoteList notes={notes.filter((n) => n.spent)} />
         </div>
       )}
