@@ -4,8 +4,8 @@ export default function FaucetPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Faucet</h1>
-        <p className="mt-1 text-zinc-400">
+        <h1 className="text-2xl font-bold text-[#ff1a1a]">Faucet</h1>
+        <p className="mt-1 text-[#888888]">
           Claim free SRD test tokens for the shielded pool
         </p>
       </div>
