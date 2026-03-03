@@ -110,23 +110,59 @@ export async function waitForDeposit(
   const poolIface = new Interface(SHIELDED_POOL_ABI);
   const depositTopic = poolIface.getEvent("Deposit")!.topicHash;
 
+  // Strategy 1: parse logs from the receipt directly (ethers v6 provider returns them).
+  // This is more reliable than getLogs filtering on single-block ranges on public RPCs.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const receiptLogs: { topics: string[]; data: string }[] = (receipt as any).logs ?? [];
+  let parsedFromReceipt = null;
+  for (const log of receiptLogs) {
+    if (
+      log.topics[0]?.toLowerCase() === depositTopic.toLowerCase() &&
+      log.topics[1] !== undefined
+    ) {
+      try {
+        parsedFromReceipt = poolIface.parseLog(log);
+        if (parsedFromReceipt) break;
+      } catch {
+        // Not a Deposit log, continue
+      }
+    }
+  }
+
+  if (parsedFromReceipt) {
+    const leafIndex = Number(parsedFromReceipt.args["leafIndex"] as bigint);
+    return finaliseNote({ ...pendingNote, createdAtBlock: receipt.blockNumber }, leafIndex);
+  }
+
+  // Strategy 2: fallback getLogs query (wider block range for safety)
   const logs = await provider.getLogs({
     address: poolAddress,
-    topics: [depositTopic, "0x" + pendingNote.noteCommitment.toString(16).padStart(64, "0")],
+    topics: [depositTopic],
     fromBlock: receipt.blockNumber,
     toBlock: receipt.blockNumber,
   });
 
-  if (logs.length === 0) throw new Error("waitForDeposit: Deposit event not found");
+  // Find the log whose commitment topic matches our note
+  const noteCommitmentHex =
+    "0x" + pendingNote.noteCommitment.toString(16).padStart(64, "0");
+  const matchingLog = logs.find(
+    (l) => l.topics[1]?.toLowerCase() === noteCommitmentHex.toLowerCase()
+  );
 
-  const parsed = poolIface.parseLog(logs[0]!);
+  if (!matchingLog) {
+    throw new Error(
+      `waitForDeposit: Deposit event not found for commitment ${noteCommitmentHex}. ` +
+        `TX ${tx.hash} was confirmed but no matching log was found.`
+    );
+  }
+
+  const parsed = poolIface.parseLog(matchingLog);
   if (!parsed) throw new Error("waitForDeposit: failed to parse Deposit event");
 
   const leafIndex = Number(parsed.args["leafIndex"] as bigint);
-  const createdAtBlock = receipt.blockNumber;
-
-  return finaliseNote({ ...pendingNote, createdAtBlock }, leafIndex);
+  return finaliseNote({ ...pendingNote, createdAtBlock: receipt.blockNumber }, leafIndex);
 }
+
 
 // ─── Private Transfer ─────────────────────────────────────────────────────────
 
