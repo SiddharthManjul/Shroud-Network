@@ -20,6 +20,9 @@ export type {
   DepositParams,
   TransferParams,
   WithdrawParams,
+  RelayTransferParams,
+  RelayWithdrawParams,
+  RelayResponse,
   EthersSigner,
   EthersProvider,
   EthersTransactionResponse,
@@ -28,6 +31,7 @@ export { SHIELDED_POOL_ABI } from "./abi/shielded-pool";
 export { TEST_TOKEN_ABI } from "./abi/test-token";
 export { TRANSFER_VERIFIER_ABI } from "./abi/transfer-verifier";
 export { WITHDRAW_VERIFIER_ABI } from "./abi/withdraw-verifier";
+export { PAYMASTER_ABI } from "./abi/paymaster";
 
 // KeyManager
 export { KeyManager, SUBGROUP_ORDER } from "./keys";
@@ -71,6 +75,8 @@ export {
   waitForDeposit,
   transfer,
   withdraw,
+  relayTransfer,
+  relayWithdraw,
 } from "./transaction";
 
 // Utilities
