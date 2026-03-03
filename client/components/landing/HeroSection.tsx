@@ -2,10 +2,16 @@
 
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { ShroudAnim } from "./ShroudAnim";
+import dynamic from "next/dynamic";
 import { FuturisticButton } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import { useWallet } from "@/hooks/use-wallet";
+
+const ShroudAnim = dynamic(
+  () => import('./ShroudAnim').then((m) => m.ShroudAnim),
+  { ssr: false }
+);
+
 
 export const HeroSection = () => {
   const { connect, connecting } = useWallet();
