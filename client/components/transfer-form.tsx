@@ -39,7 +39,7 @@ export function TransferForm() {
 
   const handleTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!ready || !address || !signer || !provider || !selectedNote) return;
+    if (!ready || !address || !provider || !selectedNote) return;
 
     const transferAmount = BigInt(amount);
     if (transferAmount <= 0n || transferAmount > selectedNote.amount) {
@@ -86,11 +86,10 @@ export function TransferForm() {
       }
 
       setStatus("Syncing Merkle tree...");
-      const { transfer } = await import("@/lib/zktoken/transaction");
+      const { relayTransfer } = await import("@/lib/zktoken/transaction");
 
       setStatus("Generating ZK proof (this may take a moment)...");
-      const result = await transfer({
-        signer: signer as never,
+      const result = await relayTransfer({
         provider: provider as never,
         poolAddress: POOL_ADDRESS,
         inputNote: selectedNote,
@@ -102,18 +101,14 @@ export function TransferForm() {
         zkeyPath: "/circuits/transfer_final.zkey",
       });
 
-      setTxHash(result.tx.hash);
-      setStatus("Transfer submitted. Waiting for confirmation...");
-
-      const receipt = await result.tx.wait();
-      if (receipt.status !== 1) throw new Error("Transaction reverted");
+      setTxHash(result.relay.txHash);
 
       markSpent(selectedNote.nullifier);
       if (result.changeNote && result.changeNote.amount > 0n) {
         saveNote(result.changeNote);
       }
 
-      setStatus("Transfer confirmed!");
+      setStatus("Transfer confirmed via relay!");
       setSelectedNoteIdx(-1);
       setAmount("");
     } catch (err) {

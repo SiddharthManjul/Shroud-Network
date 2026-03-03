@@ -121,6 +121,7 @@ function FuturisticButton({
 
   return (
     <Comp
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ref={buttonRef as any}
       data-slot="button"
       data-variant={variant}
