@@ -18,6 +18,9 @@ import {
   type DepositParams,
   type TransferParams,
   type WithdrawParams,
+  type RelayTransferParams,
+  type RelayWithdrawParams,
+  type RelayResponse,
   type EthersTransactionResponse,
   type Note,
 } from "./types";
@@ -309,4 +312,200 @@ export async function withdraw(
   const tx = await signer.sendTransaction({ to: poolAddress, data });
 
   return { tx, changeNote: proofResult.changeNote };
+}
+
+// ─── Relayed Private Transfer ────────────────────────────────────────────────
+
+/**
+ * Execute a private transfer via the relay API (no wallet signature needed).
+ *
+ * The user generates the ZK proof and encrypted memos locally, then POSTs
+ * them to the relay server which submits the transaction through the
+ * Paymaster contract. The user's EVM address never appears on-chain.
+ */
+export async function relayTransfer(
+  params: RelayTransferParams
+): Promise<{
+  relay: RelayResponse;
+  recipientNote: Note;
+  changeNote: Note;
+}> {
+  const {
+    provider,
+    poolAddress,
+    inputNote,
+    transferAmount,
+    recipientPublicKey,
+    senderPublicKey,
+    senderPrivateKey,
+    wasmPath,
+    zkeyPath,
+    relayUrl = "/api/relay",
+  } = params;
+
+  if (inputNote.spent) throw new Error("relayTransfer: inputNote is already spent");
+  if (inputNote.leafIndex < 0) throw new Error("relayTransfer: inputNote not yet finalised");
+  if (transferAmount <= 0n || transferAmount > inputNote.amount) {
+    throw new Error(`relayTransfer: invalid transferAmount ${transferAmount}`);
+  }
+
+  // 1. Sync Merkle tree
+  const tree = new MerkleTreeSync();
+  await tree.syncFromChain(provider, poolAddress);
+  const merklePath = await tree.getMerklePath(inputNote.leafIndex);
+
+  // 2. Generate proof
+  const proofResult = await generateTransferProof({
+    inputNote,
+    transferAmount,
+    recipientPublicKey,
+    senderPublicKey,
+    senderPrivateKey,
+    merklePath,
+    wasmPath,
+    zkeyPath,
+  });
+
+  // 3. Encrypt memos
+  const recipientMemoData = {
+    amount: proofResult.recipientNote.amount,
+    blinding: proofResult.recipientNote.blinding,
+    secret: proofResult.recipientNote.secret,
+    nullifierPreimage: proofResult.recipientNote.nullifierPreimage,
+  };
+  const senderMemoData = {
+    amount: proofResult.changeNote.amount,
+    blinding: proofResult.changeNote.blinding,
+    secret: proofResult.changeNote.secret,
+    nullifierPreimage: proofResult.changeNote.nullifierPreimage,
+  };
+
+  const encryptedMemo1 = await encryptMemo(recipientMemoData, recipientPublicKey);
+  const encryptedMemo2 = await encryptMemo(senderMemoData, senderPublicKey);
+
+  const [merkleRoot, nullifierHash, newCommitment1, newCommitment2] =
+    proofResult.publicSignals;
+
+  // 4. POST to relay API
+  const body = {
+    type: "transfer" as const,
+    proof: "0x" + bytesToHex(proofResult.proofBytes),
+    merkleRoot: merkleRoot.toString(),
+    nullifierHash: nullifierHash.toString(),
+    newCommitment1: newCommitment1.toString(),
+    newCommitment2: newCommitment2.toString(),
+    encryptedMemo1: "0x" + bytesToHex(encryptedMemo1),
+    encryptedMemo2: "0x" + bytesToHex(encryptedMemo2),
+  };
+
+  const res = await fetch(relayUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`relayTransfer: relay returned ${res.status}: ${errText}`);
+  }
+
+  const relay: RelayResponse = await res.json();
+
+  return {
+    relay,
+    recipientNote: proofResult.recipientNote,
+    changeNote: proofResult.changeNote,
+  };
+}
+
+// ─── Relayed Withdraw ────────────────────────────────────────────────────────
+
+/**
+ * Execute a withdrawal via the relay API (no wallet signature needed).
+ */
+export async function relayWithdraw(
+  params: RelayWithdrawParams
+): Promise<{
+  relay: RelayResponse;
+  changeNote: Note | undefined;
+}> {
+  const {
+    provider,
+    poolAddress,
+    inputNote,
+    withdrawAmount,
+    recipient,
+    senderPublicKey,
+    senderPrivateKey,
+    wasmPath,
+    zkeyPath,
+    relayUrl = "/api/relay",
+  } = params;
+
+  if (inputNote.spent) throw new Error("relayWithdraw: inputNote is already spent");
+  if (inputNote.leafIndex < 0) throw new Error("relayWithdraw: inputNote not yet finalised");
+  if (withdrawAmount <= 0n || withdrawAmount > inputNote.amount) {
+    throw new Error(`relayWithdraw: invalid withdrawAmount ${withdrawAmount}`);
+  }
+
+  getAddress(recipient);
+
+  // 1. Sync Merkle tree
+  const tree = new MerkleTreeSync();
+  await tree.syncFromChain(provider, poolAddress);
+  const merklePath = await tree.getMerklePath(inputNote.leafIndex);
+
+  // 2. Generate proof
+  const proofResult = await generateWithdrawProof({
+    inputNote,
+    withdrawAmount,
+    recipient,
+    senderPublicKey,
+    senderPrivateKey,
+    merklePath,
+    wasmPath,
+    zkeyPath,
+  });
+
+  const [merkleRoot, nullifierHash, amount, changeCommitment] = proofResult.publicSignals;
+
+  // 3. Encrypt change memo (if partial)
+  let encryptedMemoHex = "0x";
+  if (proofResult.changeNote) {
+    const changeMemoData = {
+      amount: proofResult.changeNote.amount,
+      blinding: proofResult.changeNote.blinding,
+      secret: proofResult.changeNote.secret,
+      nullifierPreimage: proofResult.changeNote.nullifierPreimage,
+    };
+    const encryptedMemo = await encryptMemo(changeMemoData, senderPublicKey);
+    encryptedMemoHex = "0x" + bytesToHex(encryptedMemo);
+  }
+
+  // 4. POST to relay API
+  const body = {
+    type: "withdraw" as const,
+    proof: "0x" + bytesToHex(proofResult.proofBytes),
+    merkleRoot: merkleRoot.toString(),
+    nullifierHash: nullifierHash.toString(),
+    amount: amount.toString(),
+    changeCommitment: changeCommitment.toString(),
+    recipient,
+    encryptedMemo: encryptedMemoHex,
+  };
+
+  const res = await fetch(relayUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`relayWithdraw: relay returned ${res.status}: ${errText}`);
+  }
+
+  const relay: RelayResponse = await res.json();
+
+  return { relay, changeNote: proofResult.changeNote };
 }
