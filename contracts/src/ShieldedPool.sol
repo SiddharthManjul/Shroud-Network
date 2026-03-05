@@ -46,6 +46,12 @@ contract ShieldedPool {
     /// @notice The ERC20 token this pool wraps.
     IERC20 public immutable token;
 
+    /// @notice Scaling factor for token amounts. The ZK circuit operates on
+    ///         whole-token amounts (e.g. 500) to fit within the 64-bit range
+    ///         proof. On-chain ERC20 transfers multiply by this scale factor
+    ///         (e.g. 500 * 1e18 = 500 tokens with 18 decimals).
+    uint256 public constant AMOUNT_SCALE = 1e18;
+
     /// @notice Groth16 verifier for the transfer circuit (4 public signals).
     IVerifier public immutable transferVerifier;
 
@@ -160,8 +166,8 @@ contract ShieldedPool {
         require(amount > 0, "ShieldedPool: zero amount");
         require(commitment != 0, "ShieldedPool: zero commitment");
 
-        // Pull tokens first — reverts on failure
-        bool ok = token.transferFrom(msg.sender, address(this), amount);
+        // Pull tokens — amount is in whole-token units, scale to ERC20 decimals
+        bool ok = token.transferFrom(msg.sender, address(this), amount * AMOUNT_SCALE);
         require(ok, "ShieldedPool: transferFrom failed");
 
         // Insert commitment into the Merkle tree
@@ -301,8 +307,8 @@ contract ShieldedPool {
             _tree.insert(changeCommitment);
         }
 
-        // ── Release tokens (last operation) ────────────────────────────────
-        bool ok = token.transfer(recipient, amount);
+        // ── Release tokens (last operation) — scale to ERC20 decimals ─────
+        bool ok = token.transfer(recipient, amount * AMOUNT_SCALE);
         require(ok, "ShieldedPool: transfer failed");
 
         emit Withdrawal(
