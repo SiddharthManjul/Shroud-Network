@@ -77,6 +77,7 @@ export {
   withdraw,
   relayTransfer,
   relayWithdraw,
+  scanChainForNotes,
 } from "./transaction";
 
 // Utilities
