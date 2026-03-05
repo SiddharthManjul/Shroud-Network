@@ -111,7 +111,7 @@ contract ShieldedPoolTest is Test {
     address alice = makeAddr("alice");
     address bob = makeAddr("bob");
 
-    uint256 constant AMOUNT = 1000 ether;
+    uint256 constant AMOUNT = 1000; // unscaled whole-token units (contract scales by 1e18)
     uint256 constant COMMITMENT_1 = 111;
     uint256 constant COMMITMENT_2 = 222;
     uint256 constant COMMITMENT_3 = 333;
@@ -130,8 +130,8 @@ contract ShieldedPoolTest is Test {
             address(poseidon)
         );
 
-        // Fund alice
-        token.mint(alice, AMOUNT * 10);
+        // Fund alice — mint scaled tokens (contract multiplies by AMOUNT_SCALE = 1e18)
+        token.mint(alice, AMOUNT * 10 * 1e18);
         vm.prank(alice);
         token.approve(address(pool), type(uint256).max);
     }
@@ -171,11 +171,12 @@ contract ShieldedPoolTest is Test {
     // ─── Deposit ─────────────────────────────────────────────────────────────
 
     function test_deposit_transfersTokens() public {
+        uint256 scaledAmount = AMOUNT * 1e18;
         uint256 balBefore = token.balanceOf(alice);
         vm.prank(alice);
         pool.deposit(AMOUNT, COMMITMENT_1);
-        assertEq(token.balanceOf(alice), balBefore - AMOUNT);
-        assertEq(token.balanceOf(address(pool)), AMOUNT);
+        assertEq(token.balanceOf(alice), balBefore - scaledAmount);
+        assertEq(token.balanceOf(address(pool)), scaledAmount);
     }
 
     function test_deposit_emitsEvent() public {
@@ -349,7 +350,7 @@ contract ShieldedPoolTest is Test {
 
         uint256 bobBalBefore = token.balanceOf(bob);
         pool.withdraw(dummyProof(), root, NULLIFIER, AMOUNT, 0, bob, "");
-        assertEq(token.balanceOf(bob), bobBalBefore + AMOUNT);
+        assertEq(token.balanceOf(bob), bobBalBefore + AMOUNT * 1e18);
     }
 
     function test_withdraw_marksNullifierSpent() public {
