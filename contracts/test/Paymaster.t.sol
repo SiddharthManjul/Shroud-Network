@@ -125,7 +125,7 @@ contract PaymasterTest is Test {
     address bob = makeAddr("bob");
     address funder = makeAddr("funder");
 
-    uint256 constant AMOUNT = 1000 ether;
+    uint256 constant AMOUNT = 1000; // unscaled whole-token units (contract scales by 1e18)
     uint256 constant COMMITMENT_1 = 111;
     uint256 constant COMMITMENT_2 = 222;
     uint256 constant COMMITMENT_3 = 333;
@@ -149,7 +149,7 @@ contract PaymasterTest is Test {
         paymaster = new Paymaster(address(pool), MAX_GAS_PRICE);
 
         // Fund alice and deposit into pool so we have notes to work with
-        token.mint(alice, AMOUNT * 10);
+        token.mint(alice, AMOUNT * 10 * 1e18);
         vm.prank(alice);
         token.approve(address(pool), type(uint256).max);
         vm.prank(alice);
@@ -436,7 +436,7 @@ contract PaymasterTest is Test {
         );
 
         assertTrue(pool.isSpent(NULLIFIER), "Nullifier should be spent");
-        assertEq(token.balanceOf(bob), AMOUNT, "Bob should receive tokens");
+        assertEq(token.balanceOf(bob), AMOUNT * 1e18, "Bob should receive tokens");
     }
 
     function test_relayWithdraw_withChangeCommitment() public {
@@ -460,7 +460,7 @@ contract PaymasterTest is Test {
             idxBefore + 1,
             "Change commitment inserted"
         );
-        assertEq(token.balanceOf(bob), AMOUNT / 2);
+        assertEq(token.balanceOf(bob), (AMOUNT / 2) * 1e18);
     }
 
     function test_relayWithdraw_emitsRelayedWithdrawEvent() public {
@@ -918,7 +918,7 @@ contract PaymasterTest is Test {
         // Step 2: Relay a withdrawal (bob gets tokens)
         root = pool.getRoot();
         uint256 nullifier2 = 1002;
-        uint256 withdrawAmount = 500 ether;
+        uint256 withdrawAmount = 500; // unscaled
         uint256 changeCommit = 501;
 
         vm.prank(relayer);
@@ -934,13 +934,13 @@ contract PaymasterTest is Test {
         );
 
         assertTrue(pool.isSpent(nullifier2), "Withdraw nullifier spent");
-        assertEq(token.balanceOf(bob), withdrawAmount, "Bob received tokens");
+        assertEq(token.balanceOf(bob), withdrawAmount * 1e18, "Bob received tokens");
         assertEq(pool.getNextLeafIndex(), 4); // +1 for change commitment
 
         // Pool still holds the remaining tokens
         assertEq(
             token.balanceOf(address(pool)),
-            AMOUNT - withdrawAmount,
+            (AMOUNT - withdrawAmount) * 1e18,
             "Pool holds remainder"
         );
     }
