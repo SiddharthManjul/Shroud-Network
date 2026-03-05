@@ -174,6 +174,17 @@ export class MerkleTreeSync {
     return this.leaves;
   }
 
+  /**
+   * Find the leaf index of a commitment in the tree.
+   * Returns -1 if not found.
+   */
+  findLeafIndex(commitment: bigint): number {
+    for (let i = 0; i < this.leaves.length; i++) {
+      if (this.leaves[i] === commitment) return i;
+    }
+    return -1;
+  }
+
   // ── Chain sync ────────────────────────────────────────────────────────────
 
   /**
