@@ -24,11 +24,12 @@ const btnSecondary =
 
 export function TransferForm() {
   const { ready } = useZkToken();
-  const { address, signer, provider } = useWallet();
+  const { address, provider } = useWallet();
   const { unspent, saveNote, markSpent } = useNotes();
   const { keypair, deriving, deriveKey } = useShieldedKey();
   const [selectedNoteIdx, setSelectedNoteIdx] = useState<number>(-1);
-  const [recipient, setRecipient] = useState("");
+  const [recipientPkX, setRecipientPkX] = useState("");
+  const [recipientPkY, setRecipientPkY] = useState("");
   const [amount, setAmount] = useState("");
   const [generating, setGenerating] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -47,8 +48,16 @@ export function TransferForm() {
       return;
     }
 
-    if (!recipient || !recipient.startsWith("0x") || recipient.length !== 42) {
-      setStatus("Error: enter a valid EVM address");
+    if (!recipientPkX || !recipientPkY) {
+      setStatus("Error: enter the recipient's shielded public key (both X and Y)");
+      return;
+    }
+
+    let recipientPublicKey: [bigint, bigint];
+    try {
+      recipientPublicKey = [BigInt(recipientPkX), BigInt(recipientPkY)];
+    } catch {
+      setStatus("Error: invalid public key format. Must be decimal or hex (0x...) numbers.");
       return;
     }
 
@@ -62,27 +71,6 @@ export function TransferForm() {
         setStatus("Sign the message in your wallet to derive your shielded key...");
         kp = await deriveKey();
         if (!kp) throw new Error("Failed to derive shielded key");
-      }
-
-      setStatus("Resolving recipient shielded key...");
-      const { keccak256, toUtf8Bytes } = await import("ethers");
-      const { KeyManager, SUBGROUP_ORDER } = await import("@/lib/zktoken/keys");
-
-      const recipientKeyStored = localStorage.getItem(
-        "zktoken_shielded_key_" + recipient.toLowerCase()
-      );
-
-      let recipientPublicKey;
-      if (recipientKeyStored) {
-        const recipientKp = await KeyManager.fromPrivateKey(recipientKeyStored);
-        recipientPublicKey = recipientKp.publicKey;
-      } else if (recipient.toLowerCase() === address.toLowerCase()) {
-        recipientPublicKey = kp.publicKey;
-      } else {
-        throw new Error(
-          "Recipient has not registered a shielded key yet. " +
-            "They must connect their wallet and derive their shielded key first."
-        );
       }
 
       setStatus("Syncing Merkle tree...");
@@ -143,15 +131,40 @@ export function TransferForm() {
         )}
       </div>
 
+      {/* Show user's own public key for sharing */}
+      {keypair && (
+        <div className="rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] p-3 space-y-1">
+          <p className="text-xs text-[#888888]">Your Shielded Public Key (share with senders):</p>
+          <p className="text-xs text-[#ff1a1a] font-mono break-all select-all">
+            X: {keypair.publicKey[0].toString()}
+          </p>
+          <p className="text-xs text-[#ff1a1a] font-mono break-all select-all">
+            Y: {keypair.publicKey[1].toString()}
+          </p>
+        </div>
+      )}
+
       <div>
         <label className="block text-sm font-medium text-[#888888] mb-1">
-          Recipient Address
+          Recipient Shielded Key (X)
         </label>
         <input
           type="text"
-          value={recipient}
-          onChange={(e) => setRecipient(e.target.value)}
-          placeholder="0x..."
+          value={recipientPkX}
+          onChange={(e) => setRecipientPkX(e.target.value)}
+          placeholder="Recipient's public key X coordinate"
+          className={`${inputClass} font-mono text-sm`}
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-[#888888] mb-1">
+          Recipient Shielded Key (Y)
+        </label>
+        <input
+          type="text"
+          value={recipientPkY}
+          onChange={(e) => setRecipientPkY(e.target.value)}
+          placeholder="Recipient's public key Y coordinate"
           className={`${inputClass} font-mono text-sm`}
         />
       </div>

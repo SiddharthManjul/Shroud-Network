@@ -74,81 +74,42 @@ export function DepositForm() {
     }
   };
 
-  // Recovery: scan on-chain Deposit events to find the leafIndex for stuck notes
+  // Recovery: sync the full Merkle tree and find leaf indices for stuck notes.
+  // Notes can come from Deposit, PrivateTransfer, or Withdrawal events —
+  // we use MerkleTreeSync which replays ALL event types in order.
   const handleRecoverNotes = async () => {
     if (!provider || pendingNotes.length === 0) return;
     setRecovering(true);
-    setStatus(`Scanning chain for ${pendingNotes.length} unfinalized note(s)...`);
+    setStatus(`Syncing Merkle tree to recover ${pendingNotes.length} unfinalized note(s)...`);
 
     try {
-      const { Interface } = await import("ethers");
-      const { SHIELDED_POOL_ABI } = await import("@/lib/zktoken/abi/shielded-pool");
+      const { MerkleTreeSync } = await import("@/lib/zktoken/merkle");
       const { finaliseNote } = await import("@/lib/zktoken/note");
 
-      const poolIface = new Interface(SHIELDED_POOL_ABI);
-      const depositTopic = poolIface.getEvent("Deposit")!.topicHash;
+      const tree = new MerkleTreeSync();
+      await tree.syncFromChain(provider as never, POOL_ADDRESS);
 
-      // Fuji public RPC allows max 2048 blocks per getLogs request — paginate.
-      const CHUNK = 2048;
-      const LOOK_BACK = 50000; // ~1.5 days of Fuji blocks (~2s/block)
-      const currentBlock = await (provider as never as { getBlockNumber(): Promise<number> }).getBlockNumber();
-      const startBlock = Math.max(0, currentBlock - LOOK_BACK);
-
-      type LogEntry = { topics: string[]; data: string; blockNumber: number };
-      const typedProvider = provider as never as { getLogs(f: object): Promise<LogEntry[]> };
-
-      const allLogs: LogEntry[] = [];
-      const totalChunks = Math.ceil((currentBlock - startBlock + 1) / CHUNK);
-      let chunkIdx = 0;
-      for (let from = startBlock; from <= currentBlock; from += CHUNK) {
-        const to = Math.min(from + CHUNK - 1, currentBlock);
-        chunkIdx++;
-        setStatus(`Chunk ${chunkIdx}/${totalChunks} — blocks ${from}–${to}…`);
-        const chunk = await typedProvider.getLogs({
-          address: POOL_ADDRESS,
-          topics: [depositTopic],
-          fromBlock: from,
-          toBlock: to,
-        });
-        allLogs.push(...chunk);
-      }
-
-      const logs = allLogs;
-
-
-      // Debug: compare local commitments vs on-chain
-      console.log(`[recovery] ${allLogs.length} Deposit event(s) found in last ${LOOK_BACK} blocks`);
-      allLogs.forEach(l => console.log(`[recovery] on-chain: ${l.topics[1]}`));
-      pendingNotes.forEach(n => console.log(`[recovery] local:    0x${n.noteCommitment.toString(16).padStart(64, '0')}`));
+      setStatus(`Tree synced (${tree.size} leaves). Matching commitments...`);
 
       let recovered = 0;
       for (const note of pendingNotes) {
-        const noteCommitmentHex =
-          "0x" + note.noteCommitment.toString(16).padStart(64, "0");
-
-        const matching = logs.find(
-          (l) => l.topics[1]?.toLowerCase() === noteCommitmentHex.toLowerCase()
-        );
-
-        if (matching) {
-          const parsed = poolIface.parseLog(matching);
-          if (parsed) {
-            const leafIndex = Number(parsed.args["leafIndex"] as bigint);
-            const finalized = await finaliseNote(
-              { ...note, createdAtBlock: matching.blockNumber },
-              leafIndex
-            );
-            saveNote(finalized);
-            recovered++;
-          }
+        const leafIndex = tree.findLeafIndex(note.noteCommitment);
+        if (leafIndex >= 0) {
+          const finalized = await finaliseNote(note, leafIndex);
+          saveNote(finalized);
+          recovered++;
+        } else {
+          console.log(
+            `[recovery] no match for local commitment 0x${note.noteCommitment.toString(16).padStart(64, "0")}`
+          );
         }
       }
 
       setStatus(
         recovered > 0
-          ? `✓ Recovered ${recovered} note(s)! They are now ready to use.`
-          : `No match in last ${LOOK_BACK} blocks (${allLogs.length} Deposit events found). ` +
-            `Check browser console — compare 'local' vs 'on-chain' commitment hashes.`
+          ? `Recovered ${recovered} note(s)! They are now ready to use.`
+          : `No matching commitments found in ${tree.size} on-chain leaves. ` +
+            `The notes may have been created with different parameters.`
       );
     } catch (err) {
       setStatus(`Recovery error: ${err instanceof Error ? err.message : String(err)}`);
