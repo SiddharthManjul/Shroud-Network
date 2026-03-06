@@ -78,7 +78,35 @@ export {
   relayTransfer,
   relayWithdraw,
   scanChainForNotes,
+  scanNotesFromRelay,
+  scanNotesFromIndexer,
 } from "./transaction";
+
+// Indexer (Envio HyperIndex GraphQL client)
+export {
+  fetchMerkleLeaves,
+  fetchMemoEvents,
+  fetchPoolState,
+} from "./indexer";
+export type {
+  MerkleLeafData,
+  IndexerMemoEvent,
+  PoolStateData,
+} from "./indexer";
+
+// Notification Relay
+export {
+  postNotification,
+  postSelfNotification,
+  fetchNotifications,
+  deleteNotification,
+  clearNotifications,
+  deriveTag,
+} from "./relay-notify";
+export type {
+  NotificationData,
+  ReceivedNotification,
+} from "./relay-notify";
 
 // Key Vault (encrypted private key storage)
 export {
