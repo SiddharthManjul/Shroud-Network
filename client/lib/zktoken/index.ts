@@ -80,5 +80,20 @@ export {
   scanChainForNotes,
 } from "./transaction";
 
+// Key Vault (encrypted private key storage)
+export {
+  isPasskeySupported,
+  getVaultStatus,
+  storeWithPIN,
+  storeWithPasskey,
+  unlock,
+  getPlaintextKeyForMigration,
+  deleteVault,
+  validatePIN,
+  changePIN,
+  switchMethod,
+} from "./key-vault";
+export type { VaultMethod, VaultData, VaultStatus } from "./key-vault";
+
 // Utilities
 export { bytesToHex, hexToBytes } from "./utils";
