@@ -2,6 +2,7 @@
 
 import { ZkTokenProvider } from "@/providers/zktoken-provider";
 import { WalletProvider } from "@/providers/wallet-provider";
+import { ShieldedKeyProvider } from "@/providers/shielded-key-provider";
 import { Nav } from "@/components/nav";
 import { VaultGate } from "@/components/vault-gate";
 import { useWallet } from "@/hooks/use-wallet";
@@ -52,9 +53,11 @@ function AppShell({ children }: { children: ReactNode }) {
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <WalletProvider>
-      <ZkTokenProvider>
-        <AppShell>{children}</AppShell>
-      </ZkTokenProvider>
+      <ShieldedKeyProvider>
+        <ZkTokenProvider>
+          <AppShell>{children}</AppShell>
+        </ZkTokenProvider>
+      </ShieldedKeyProvider>
     </WalletProvider>
   );
 }
