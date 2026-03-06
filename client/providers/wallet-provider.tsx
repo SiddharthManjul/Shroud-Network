@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -65,6 +66,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [provider, setProvider] = useState<BrowserProvider | null>(null);
   const [chainId, setChainId] = useState<bigint | null>(null);
   const [connecting, setConnecting] = useState(false);
+  const connectingRef = useRef(false);
 
   const switchToExpectedNetwork = useCallback(async () => {
     if (!window.ethereum) return;
@@ -93,12 +95,42 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /** Refresh provider/signer/chain state without calling eth_requestAccounts. */
+  const refreshState = useCallback(async () => {
+    if (!window.ethereum) return;
+    try {
+      const bp = new BrowserProvider(window.ethereum);
+      const accounts = (await bp.send("eth_accounts", [])) as string[];
+      if (accounts.length === 0) {
+        setAddress(null);
+        setSigner(null);
+        setProvider(null);
+        setChainId(null);
+        return;
+      }
+      const s = await bp.getSigner();
+      const addr = await s.getAddress();
+      const network = await bp.getNetwork();
+
+      setProvider(bp);
+      setSigner(s);
+      setAddress(addr);
+      setChainId(network.chainId);
+    } catch {
+      // Ignore — wallet may be locked
+    }
+  }, []);
+
   const connect = useCallback(async () => {
     if (!window.ethereum) {
       throw new Error("No injected wallet found");
     }
 
+    // Prevent concurrent eth_requestAccounts calls
+    if (connectingRef.current) return;
+    connectingRef.current = true;
     setConnecting(true);
+
     try {
       const bp = new BrowserProvider(window.ethereum);
       await bp.send("eth_requestAccounts", []);
@@ -111,22 +143,19 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       setAddress(addr);
       setChainId(network.chainId);
 
-      // Prompt network switch if on wrong chain
+      // Prompt network switch if on wrong chain (only on explicit connect)
       if (Number(network.chainId) !== EXPECTED_CHAIN_ID) {
         try {
-          const hexChainId = "0x" + EXPECTED_CHAIN_ID.toString(16);
-          await window.ethereum.request({
-            method: "wallet_switchEthereumChain",
-            params: [{ chainId: hexChainId }],
-          });
+          await switchToExpectedNetwork();
         } catch {
           // User rejected — stay on current chain
         }
       }
     } finally {
+      connectingRef.current = false;
       setConnecting(false);
     }
-  }, []);
+  }, [switchToExpectedNetwork]);
 
   const disconnect = useCallback(() => {
     setAddress(null);
@@ -144,22 +173,22 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       const accounts = args[0] as string[];
       if (accounts.length === 0) {
         disconnect();
-      } else if (address) {
-        // Reconnect with new account
-        connect();
+      } else {
+        // Refresh state without prompting eth_requestAccounts again
+        refreshState();
       }
     };
 
     const handleChainChanged = () => {
-      // Reconnect to pick up new chain
-      if (address) connect();
+      // Refresh state without prompting eth_requestAccounts or network switch
+      refreshState();
     };
 
     try {
       eth.on("accountsChanged", handleAccountsChanged);
       eth.on("chainChanged", handleChainChanged);
     } catch {
-      // Provider doesn't support event listeners (e.g. MetaMask proxy)
+      // Provider doesn't support event listeners
       return;
     }
 
@@ -171,7 +200,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         // ignore
       }
     };
-  }, [address, connect, disconnect]);
+  }, [disconnect, refreshState]);
 
   const networkName = chainId
     ? CHAIN_NAMES[Number(chainId)] ?? `Chain ${chainId}`
