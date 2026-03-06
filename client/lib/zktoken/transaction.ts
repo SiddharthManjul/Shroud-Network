@@ -517,6 +517,18 @@ export async function relayTransfer(
     relay.blockNumber
   );
 
+  // 6. Post notifications for recipient and self (fire-and-forget)
+  _postTransferNotifications({
+    recipientPubKey: recipientPublicKey,
+    senderPubKey: senderPublicKey,
+    txHash: relay.txHash,
+    blockNumber: relay.blockNumber,
+    recipientNote: finalizedNotes.recipientNote,
+    changeNote: finalizedNotes.changeNote,
+    encryptedMemo1Hex: "0x" + bytesToHex(encryptedMemo1),
+    encryptedMemo2Hex: "0x" + bytesToHex(encryptedMemo2),
+  }).catch(() => {}); // Non-critical
+
   return {
     relay,
     recipientNote: finalizedNotes.recipientNote,
@@ -647,7 +659,59 @@ export async function relayWithdraw(
     }
   }
 
+  // 6. Self-notify for change note recovery on other devices (fire-and-forget)
+  if (finalizedChange) {
+    import("./relay-notify").then(({ postSelfNotification }) => {
+      postSelfNotification({
+        myPubKey: senderPublicKey,
+        txHash: relay.txHash,
+        leafIndex: finalizedChange!.leafIndex,
+        blockNumber: relay.blockNumber,
+        eventType: "withdrawal",
+        memoHex: encryptedMemoHex,
+        commitment: finalizedChange!.noteCommitment.toString(),
+      }).catch(() => {});
+    });
+  }
+
   return { relay, changeNote: finalizedChange };
+}
+
+// ─── Internal: post notifications after transfer ─────────────────────────────
+
+async function _postTransferNotifications(params: {
+  recipientPubKey: import("./types").BabyJubPoint;
+  senderPubKey: import("./types").BabyJubPoint;
+  txHash: string;
+  blockNumber: number;
+  recipientNote: Note;
+  changeNote: Note;
+  encryptedMemo1Hex: string;
+  encryptedMemo2Hex: string;
+}): Promise<void> {
+  const { postNotification, postSelfNotification } = await import("./relay-notify");
+
+  // Notify recipient
+  await postNotification({
+    recipientPubKey: params.recipientPubKey,
+    txHash: params.txHash,
+    leafIndex: params.recipientNote.leafIndex,
+    blockNumber: params.blockNumber,
+    eventType: "transfer",
+    memoHex: params.encryptedMemo1Hex,
+    commitment: params.recipientNote.noteCommitment.toString(),
+  });
+
+  // Self-notify for change note recovery
+  await postSelfNotification({
+    myPubKey: params.senderPubKey,
+    txHash: params.txHash,
+    leafIndex: params.changeNote.leafIndex,
+    blockNumber: params.blockNumber,
+    eventType: "transfer",
+    memoHex: params.encryptedMemo2Hex,
+    commitment: params.changeNote.noteCommitment.toString(),
+  });
 }
 
 // ─── Internal: finalize transfer output notes ────────────────────────────────
@@ -813,6 +877,104 @@ export async function scanChainForNotes(params: {
 
     // Skip notes we already know about
     if (existingNullifiers?.has(note.nullifier.toString())) continue;
+
+    discoveredNotes.push(note);
+  }
+
+  return discoveredNotes;
+}
+
+// ─── Scan via notification relay (instant, no chain scanning) ───────────────
+
+/**
+ * Discover notes via the notification relay.
+ * The sender posted encrypted notifications after each transfer.
+ * This is O(1) per notification — no full chain scan needed.
+ *
+ * Falls back gracefully: returns empty array if relay is unreachable.
+ */
+export async function scanNotesFromRelay(params: {
+  myPrivateKey: bigint;
+  myPublicKey: import("./types").BabyJubPoint;
+  tokenAddress: string;
+  existingCommitments?: Set<string>;
+}): Promise<Note[]> {
+  const { fetchNotifications, deleteNotification } = await import("./relay-notify");
+
+  const notifications = await fetchNotifications(
+    params.myPublicKey,
+    params.myPrivateKey
+  );
+
+  const discoveredNotes: Note[] = [];
+
+  for (const notif of notifications) {
+    // Skip notes we already have
+    if (params.existingCommitments?.has(notif.data.commitment)) {
+      // Clean up processed notification
+      deleteNotification(params.myPublicKey, notif.id).catch(() => {});
+      continue;
+    }
+
+    // The notification contains the on-chain memo — decrypt it for note data
+    const memoBytes = hexToBytes(
+      notif.data.memoHex.startsWith("0x")
+        ? notif.data.memoHex.slice(2)
+        : notif.data.memoHex
+    );
+    const memoData = await decryptMemo(memoBytes, params.myPrivateKey);
+    if (memoData === null) continue;
+
+    const note = await noteFromMemoData(
+      memoData,
+      params.myPublicKey,
+      params.tokenAddress,
+      notif.data.leafIndex,
+      notif.data.blockNumber
+    );
+
+    discoveredNotes.push(note);
+
+    // Clean up processed notification
+    deleteNotification(params.myPublicKey, notif.id).catch(() => {});
+  }
+
+  return discoveredNotes;
+}
+
+// ─── Scan via indexer (fast, replaces full chain scanning) ──────────────────
+
+/**
+ * Discover notes via the Envio indexer.
+ * Similar to scanChainForNotes but queries indexed data instead of RPC chunks.
+ */
+export async function scanNotesFromIndexer(params: {
+  myPrivateKey: bigint;
+  myPublicKey: import("./types").BabyJubPoint;
+  tokenAddress: string;
+  existingCommitments?: Set<string>;
+  afterBlock?: number;
+}): Promise<Note[]> {
+  const { fetchMemoEvents } = await import("./indexer");
+  const memoEvents = await fetchMemoEvents(params.afterBlock);
+
+  const discoveredNotes: Note[] = [];
+  for (const event of memoEvents) {
+    if (params.existingCommitments?.has(event.commitment.toString())) continue;
+
+    const memoBytes = hexToBytes(
+      event.memoHex.startsWith("0x") ? event.memoHex.slice(2) : event.memoHex
+    );
+    const memoData = await decryptMemo(memoBytes, params.myPrivateKey);
+    if (memoData === null) continue;
+
+    const note = await noteFromMemoData(
+      memoData,
+      params.myPublicKey,
+      params.tokenAddress,
+      event.leafIndex,
+      event.blockNumber
+    );
 
     discoveredNotes.push(note);
   }
