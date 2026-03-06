@@ -1,0 +1,16 @@
+{
+  "name": "zktoken-indexer",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "envio dev",
+    "codegen": "envio codegen",
+    "start": "envio start"
+  },
+  "dependencies": {
+    "envio": "^2.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5"
+  }
+}
