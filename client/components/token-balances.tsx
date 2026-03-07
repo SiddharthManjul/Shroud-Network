@@ -2,6 +2,7 @@
 
 import { useWallet } from "@/hooks/use-wallet";
 import { useNotes } from "@/hooks/use-notes";
+import { useToken } from "@/providers/token-provider";
 import { useEffect, useState } from "react";
 import { BrowserProvider, Contract, formatEther, formatUnits } from "ethers";
 import { TEST_TOKEN_ABI } from "@/lib/zktoken/abi/test-token";
@@ -16,7 +17,9 @@ interface TokenInfo {
 export function TokenBalances() {
   const { address, provider } = useWallet();
   const { unspent } = useNotes();
+  const { activeToken } = useToken();
   const shieldedTotal = unspent.reduce((sum, n) => sum + n.amount, 0n);
+  const tokenSymbol = activeToken?.symbol ?? "Token";
   const [avaxBalance, setAvaxBalance] = useState<string | null>(null);
   const [tokenInfo, setTokenInfo] = useState<TokenInfo | null>(null);
   const [loading, setLoading] = useState(false);
@@ -36,7 +39,7 @@ export function TokenBalances() {
         const rawBalance = await provider!.getBalance(address!);
         if (!cancelled) setAvaxBalance(formatEther(rawBalance));
 
-        const tokenAddr = process.env.NEXT_PUBLIC_TOKEN_ADDRESS;
+        const tokenAddr = activeToken?.token ?? process.env.NEXT_PUBLIC_TOKEN_ADDRESS;
         if (tokenAddr && tokenAddr.length > 0) {
           const erc20 = new Contract(
             tokenAddr,
@@ -68,7 +71,7 @@ export function TokenBalances() {
     return () => {
       cancelled = true;
     };
-  }, [address, provider]);
+  }, [address, provider, activeToken]);
 
   if (!address) return null;
 
@@ -116,12 +119,12 @@ export function TokenBalances() {
 
       {/* Shielded balance */}
       <div className={cardClass}>
-        <p className={labelClass}>Shielded SRD</p>
+        <p className={labelClass}>Shielded {tokenSymbol}</p>
         <p className={valueClass}>
           {shieldedTotal > 0n ? (
-            `${shieldedTotal.toString()} zkSRD`
+            `${shieldedTotal.toString()} zk${tokenSymbol}`
           ) : (
-            <span className={dimClass}>0 zkSRD</span>
+            <span className={dimClass}>0 zk{tokenSymbol}</span>
           )}
         </p>
         <p className="mt-0.5 text-xs text-[#666666]">
