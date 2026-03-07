@@ -115,7 +115,7 @@ export const ScrollSections = () => {
                 <span className="inline-block text-xs font-semibold uppercase tracking-widest text-[#ff1a1a]/60 border border-[#ff1a1a]/20 rounded-full px-3 py-1">
                   {section.title}
                 </span>
-                <h2 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#ff1a1a] to-[#ff6b6b]">
+                <h2 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-linear-to-r from-[#ff1a1a] to-[#ff6b6b]">
                   {section.headline}
                 </h2>
                 <p className="text-xl text-[#888888] leading-relaxed max-w-2xl">
@@ -133,7 +133,7 @@ export const ScrollSections = () => {
                   }}
                 >
                   {section.visual}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
+                  <div className="absolute inset-0 bg-linear-to-t from-black/40 to-transparent pointer-events-none" />
                 </div>
               </div>
             </motion.div>
