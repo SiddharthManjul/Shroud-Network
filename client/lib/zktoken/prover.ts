@@ -443,8 +443,16 @@ export async function generateWithdrawProof(
     };
   } else {
     // Full withdrawal: change_blinding = blinding_in (circuit constraint),
-    // but change_amount = 0 so the change commitment is trivial.
+    // change_amount = 0 but the circuit still computes the Poseidon hash,
+    // so we must compute the real commitment (Poseidon(0,...) ≠ 0).
     changeBlinding = inputNote.blinding;
+    changePedersen = await computePedersenCommitment(0n, changeBlinding);
+    changeCommitmentValue = await computeNoteCommitment(
+      changePedersen,
+      secretOut,
+      nullifierPreimageOut,
+      senderPublicKey[0]
+    );
   }
 
   // ── Build witness ───────────────────────────────────────────────────────────
