@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { WalletButton } from "./wallet-button";
+import { TokenSelector } from "./token-selector";
 
 // Dashboard is the root of the app — user lands here after wallet connect.
 // No need to link to it; just provide the other app sections.
@@ -11,6 +12,7 @@ const links = [
   { href: "/transfer", label: "Transfer" },
   { href: "/withdraw", label: "Withdraw" },
   { href: "/notes", label: "Notes" },
+  { href: "/pools", label: "Pools" },
   { href: "/faucet", label: "Faucet" },
 ];
 
@@ -40,7 +42,10 @@ export function Nav() {
             ))}
           </div>
         </div>
-        <WalletButton />
+        <div className="flex items-center gap-4">
+          <TokenSelector />
+          <WalletButton />
+        </div>
       </div>
     </nav>
   );
