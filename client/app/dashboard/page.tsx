@@ -3,6 +3,7 @@
 import { useZkToken } from "@/hooks/use-zktoken";
 import { useWallet } from "@/hooks/use-wallet";
 import { useNotes } from "@/hooks/use-notes";
+import { useToken } from "@/providers/token-provider";
 import { TokenBalances } from "@/components/token-balances";
 import Link from "next/link";
 
@@ -10,6 +11,8 @@ export default function DashboardPage() {
   const { ready, error } = useZkToken();
   const { address, chainId, networkName, wrongNetwork, switchToExpectedNetwork } = useWallet();
   const { unspent } = useNotes();
+  const { activeToken } = useToken();
+  const tokenSymbol = activeToken?.symbol ?? "Token";
 
   return (
     <div className="space-y-8">
@@ -59,7 +62,7 @@ export default function DashboardPage() {
             {unspent.length} unspent
           </p>
           <p className="mt-0.5 text-sm font-mono text-[#888888]">
-            {unspent.reduce((s, n) => s + n.amount, 0n).toString()} zkSRD
+            {unspent.reduce((s, n) => s + n.amount, 0n).toString()} zk{tokenSymbol}
           </p>
         </div>
       </div>
@@ -89,11 +92,12 @@ export default function DashboardPage() {
       {/* Quick actions */}
       <div>
         <h2 className="text-lg font-semibold text-[#ff1a1a] mb-3">Quick Actions</h2>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-4">
           {[
             { href: "/deposit", label: "Deposit", desc: "Lock ERC20 tokens into the shielded pool" },
             { href: "/transfer", label: "Transfer", desc: "Send tokens privately within the pool" },
             { href: "/withdraw", label: "Withdraw", desc: "Exit tokens from the pool to any address" },
+            { href: "/pools", label: "Pools", desc: "Create a shielded pool for any ERC20 token" },
           ].map(({ href, label, desc }) => (
             <Link
               key={href}
