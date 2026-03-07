@@ -3,9 +3,8 @@
 import { useState } from "react";
 import { Interface, parseUnits } from "ethers";
 import { useWallet } from "@/hooks/use-wallet";
+import { useToken } from "@/providers/token-provider";
 import { TEST_TOKEN_ABI } from "@/lib/zktoken/abi/test-token";
-
-const TOKEN_ADDRESS = process.env.NEXT_PUBLIC_TOKEN_ADDRESS ?? "";
 
 const inputClass =
   "w-full rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] px-3 py-2 text-[#ff1a1a] placeholder:text-[#444444] focus:border-[#ff1a1a] focus:outline-none transition-colors duration-200";
@@ -18,6 +17,11 @@ const btnSecondary =
 
 export function FaucetForm() {
   const { address, signer } = useWallet();
+  const { activeToken } = useToken();
+
+  const TOKEN_ADDRESS = activeToken?.token ?? "";
+  const tokenSymbol = activeToken?.symbol ?? "Token";
+  const tokenDecimals = activeToken?.decimals ?? 18;
   const [amount, setAmount] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -31,7 +35,7 @@ export function FaucetForm() {
     try {
       const iface = new Interface(TEST_TOKEN_ABI);
       const data = amount.trim()
-        ? iface.encodeFunctionData("faucet(uint256)", [parseUnits(amount, 18)])
+        ? iface.encodeFunctionData("faucet(uint256)", [parseUnits(amount, tokenDecimals)])
         : iface.encodeFunctionData("faucet()");
 
       const tx = await signer.sendTransaction({ to: TOKEN_ADDRESS, data });
@@ -53,8 +57,8 @@ export function FaucetForm() {
           type: "ERC20",
           options: {
             address: TOKEN_ADDRESS,
-            symbol: "SRD",
-            decimals: 18,
+            symbol: tokenSymbol,
+            decimals: tokenDecimals,
           },
         },
       });
@@ -68,7 +72,7 @@ export function FaucetForm() {
       <form onSubmit={handleClaim} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-[#888888] mb-1">
-            Amount (SRD)
+            Amount ({tokenSymbol})
           </label>
           <input
             type="text"
@@ -93,7 +97,7 @@ export function FaucetForm() {
       <hr className="border-[#2a2a2a]" />
 
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-[#ff1a1a]">Add SRD to Wallet</h2>
+        <h2 className="text-lg font-semibold text-[#ff1a1a]">Add {tokenSymbol} to Wallet</h2>
         <button type="button" onClick={addToWallet} className={btnSecondary}>
           Add to MetaMask
         </button>
@@ -106,11 +110,11 @@ export function FaucetForm() {
           </div>
           <div className="flex justify-between">
             <span className="text-[#888888]">Symbol</span>
-            <span className="text-[#ff1a1a]">SRD</span>
+            <span className="text-[#ff1a1a]">{tokenSymbol}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-[#888888]">Decimals</span>
-            <span className="text-[#ff1a1a]">18</span>
+            <span className="text-[#ff1a1a]">{tokenDecimals}</span>
           </div>
         </div>
       </div>
