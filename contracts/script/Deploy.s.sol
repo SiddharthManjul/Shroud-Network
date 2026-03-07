@@ -75,7 +75,8 @@ contract Deploy is Script {
             tokenAddress,
             transferVerifier,
             withdrawVerifier,
-            poseidonAddress
+            poseidonAddress,
+            1e18 // amountScale: 18-decimal tokens (SRD, WAVAX)
         );
         console.log("ShieldedPool    :", address(pool));
         console.log("Initial root    :", pool.getRoot());
