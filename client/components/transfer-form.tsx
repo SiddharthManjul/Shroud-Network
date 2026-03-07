@@ -5,10 +5,9 @@ import { useWallet } from "@/hooks/use-wallet";
 import { useZkToken } from "@/hooks/use-zktoken";
 import { useNotes } from "@/hooks/use-notes";
 import { useShieldedKey } from "@/hooks/use-shielded-key";
+import { useToken } from "@/providers/token-provider";
 import { ProofStatus } from "./proof-status";
 import type { Note } from "@/lib/zktoken/types";
-
-const POOL_ADDRESS = process.env.NEXT_PUBLIC_SHIELDED_POOL_ADDRESS ?? "";
 
 const inputClass =
   "w-full rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] px-3 py-2 text-[#ff1a1a] placeholder:text-[#444444] focus:border-[#ff1a1a] focus:outline-none transition-colors duration-200";
@@ -27,6 +26,10 @@ export function TransferForm() {
   const { address, provider } = useWallet();
   const { unspent, saveNote, markSpent } = useNotes();
   const { keypair, deriveKey } = useShieldedKey();
+  const { activeToken } = useToken();
+
+  const POOL_ADDRESS = activeToken?.pool ?? "";
+  const tokenSymbol = activeToken?.symbol ?? "Token";
   const [selectedNoteIdx, setSelectedNoteIdx] = useState<number>(-1);
   const [recipientPkX, setRecipientPkX] = useState("");
   const [recipientPkY, setRecipientPkY] = useState("");
@@ -42,7 +45,12 @@ export function TransferForm() {
     e.preventDefault();
     if (!ready || !address || !provider || !selectedNote) return;
 
-    const transferAmount = BigInt(amount);
+    const trimmed = amount.trim();
+    if (!trimmed || !/^\d+$/.test(trimmed)) {
+      setStatus("Error: amount must be a whole number (no decimals)");
+      return;
+    }
+    const transferAmount = BigInt(trimmed);
     if (transferAmount <= 0n || transferAmount > selectedNote.amount) {
       setStatus(`Error: amount must be between 1 and ${selectedNote.amount}`);
       return;
@@ -87,6 +95,7 @@ export function TransferForm() {
         senderPrivateKey: kp.privateKey,
         wasmPath: "/circuits/transfer.wasm",
         zkeyPath: "/circuits/transfer_final.zkey",
+        paymasterAddress: activeToken?.paymaster,
       });
 
       setTxHash(result.relay.txHash);
@@ -124,7 +133,7 @@ export function TransferForm() {
             <option value={-1}>Choose a note...</option>
             {unspent.map((note, i) => (
               <option key={note.noteCommitment.toString()} value={i}>
-                {note.amount.toString()} SRD (leaf #{note.leafIndex})
+                {note.amount.toString()} {tokenSymbol} (leaf #{note.leafIndex})
               </option>
             ))}
           </select>
@@ -171,7 +180,7 @@ export function TransferForm() {
 
       <div>
         <label className="block text-sm font-medium text-[#888888] mb-1">
-          Amount (SRD)
+          Amount ({tokenSymbol})
         </label>
         <input
           type="text"
