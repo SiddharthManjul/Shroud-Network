@@ -255,6 +255,8 @@ export interface RelayTransferParams {
   zkeyPath: string;
   /** Relay API URL (defaults to "/api/relay"). */
   relayUrl?: string;
+  /** Paymaster address (sent to relay so it knows which paymaster to use). */
+  paymasterAddress?: string;
 }
 
 /** Parameters for a relayed withdrawal (no signer needed). */
@@ -279,6 +281,8 @@ export interface RelayWithdrawParams {
   zkeyPath: string;
   /** Relay API URL (defaults to "/api/relay"). */
   relayUrl?: string;
+  /** Paymaster address (sent to relay so it knows which paymaster to use). */
+  paymasterAddress?: string;
 }
 
 /** Response from the relay API. */
