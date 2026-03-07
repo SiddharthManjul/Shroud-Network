@@ -11,7 +11,7 @@ const PAYMASTER_ADDRESS = process.env.NEXT_PUBLIC_PAYMASTER_ADDRESS;
 // ─── GET /api/relay — Discovery endpoint ─────────────────────────────────────
 
 export async function GET() {
-  if (!RELAY_PRIVATE_KEY || !PAYMASTER_ADDRESS) {
+  if (!RELAY_PRIVATE_KEY) {
     return NextResponse.json(
       { error: "Relay not configured" },
       { status: 503 }
@@ -23,7 +23,7 @@ export async function GET() {
 
   return NextResponse.json({
     relayerAddress: wallet.address,
-    paymasterAddress: PAYMASTER_ADDRESS,
+    paymasterAddress: PAYMASTER_ADDRESS ?? null,
   });
 }
 
@@ -38,6 +38,7 @@ interface TransferBody {
   newCommitment2: string;
   encryptedMemo1: string;
   encryptedMemo2: string;
+  paymasterAddress?: string;
 }
 
 interface WithdrawBody {
@@ -49,14 +50,15 @@ interface WithdrawBody {
   changeCommitment: string;
   recipient: string;
   encryptedMemo: string;
+  paymasterAddress?: string;
 }
 
 type RelayBody = TransferBody | WithdrawBody;
 
 export async function POST(request: NextRequest) {
-  if (!RELAY_PRIVATE_KEY || !RELAY_RPC_URL || !PAYMASTER_ADDRESS) {
+  if (!RELAY_PRIVATE_KEY || !RELAY_RPC_URL) {
     return NextResponse.json(
-      { error: "Relay not configured. Set RELAY_PRIVATE_KEY, RELAY_RPC_URL, and NEXT_PUBLIC_PAYMASTER_ADDRESS." },
+      { error: "Relay not configured. Set RELAY_PRIVATE_KEY and RELAY_RPC_URL." },
       { status: 503 }
     );
   }
@@ -71,6 +73,15 @@ export async function POST(request: NextRequest) {
   if (!body.type || !["transfer", "withdraw"].includes(body.type)) {
     return NextResponse.json(
       { error: "Missing or invalid 'type' field. Must be 'transfer' or 'withdraw'." },
+      { status: 400 }
+    );
+  }
+
+  // Use paymasterAddress from body (multi-token), fall back to env var (legacy)
+  const targetPaymaster = body.paymasterAddress || PAYMASTER_ADDRESS;
+  if (!targetPaymaster) {
+    return NextResponse.json(
+      { error: "No paymaster address provided and NEXT_PUBLIC_PAYMASTER_ADDRESS not set." },
       { status: 400 }
     );
   }
@@ -115,7 +126,7 @@ export async function POST(request: NextRequest) {
     }
 
     const tx = await wallet.sendTransaction({
-      to: PAYMASTER_ADDRESS,
+      to: targetPaymaster,
       data,
     });
 
