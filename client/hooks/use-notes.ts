@@ -4,16 +4,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Note } from "@/lib/zktoken/types";
 import { NoteStore, encodeNote, decodeNote } from "@/lib/zktoken/note";
 import { useShieldedKey } from "./use-shielded-key";
+import { useToken } from "@/providers/token-provider";
 
 const STORAGE_PREFIX = "zktoken_notes_";
 const SCAN_BLOCK_KEY = "zktoken_last_scan_block";
 
-const TOKEN_ADDRESS = process.env.NEXT_PUBLIC_TOKEN_ADDRESS ?? "";
-const POOL_ADDRESS = process.env.NEXT_PUBLIC_SHIELDED_POOL_ADDRESS ?? "";
-
-/** Derive the localStorage key for a given shielded public key. */
-function storageKeyFor(pkX: bigint): string {
-  return STORAGE_PREFIX + pkX.toString(16).slice(0, 16);
+/** Derive the localStorage key for a given shielded public key + token address. */
+function storageKeyFor(pkX: bigint, tokenAddress?: string): string {
+  const base = STORAGE_PREFIX + pkX.toString(16).slice(0, 16);
+  if (tokenAddress) {
+    return base + "_" + tokenAddress.toLowerCase().slice(0, 10);
+  }
+  return base;
 }
 
 /**
@@ -32,9 +34,13 @@ export function useNotes() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(false);
   const { keypair } = useShieldedKey();
+  const { activeToken } = useToken();
   const currentKeyRef = useRef<string | null>(null);
 
-  // Hydrate from localStorage cache when keypair changes
+  const TOKEN_ADDRESS = activeToken?.token ?? "";
+  const POOL_ADDRESS = activeToken?.pool ?? "";
+
+  // Hydrate from localStorage cache when keypair or active token changes
   useEffect(() => {
     storeRef.current.clear();
 
@@ -44,7 +50,7 @@ export function useNotes() {
       return;
     }
 
-    const key = storageKeyFor(keypair.publicKey[0]);
+    const key = storageKeyFor(keypair.publicKey[0], TOKEN_ADDRESS);
     currentKeyRef.current = key;
 
     try {
@@ -56,7 +62,22 @@ export function useNotes() {
         }
       }
 
-      // Migrate old global key (one-time)
+      // Migrate old global key (one-time) — try legacy key without token suffix
+      const legacyKey = STORAGE_PREFIX + keypair.publicKey[0].toString(16).slice(0, 16);
+      if (key !== legacyKey) {
+        const oldRaw = localStorage.getItem(legacyKey);
+        if (oldRaw) {
+          const oldArr = JSON.parse(oldRaw) as string[];
+          for (const json of oldArr) {
+            const note = decodeNote(json);
+            if (note.ownerPublicKey[0] === keypair.publicKey[0]) {
+              storeRef.current.save(note);
+            }
+          }
+        }
+      }
+
+      // Migrate very old global key (one-time)
       const oldRaw = localStorage.getItem("zktoken_notes");
       if (oldRaw) {
         const oldArr = JSON.parse(oldRaw) as string[];
@@ -72,7 +93,7 @@ export function useNotes() {
     } catch {
       // Ignore corrupt storage
     }
-  }, [keypair]);
+  }, [keypair, TOKEN_ADDRESS]);
 
   const persist = useCallback(() => {
     const all = storeRef.current.getAll();
@@ -213,7 +234,7 @@ export function useNotes() {
     } finally {
       setLoading(false);
     }
-  }, [keypair, persist]);
+  }, [keypair, persist, TOKEN_ADDRESS, POOL_ADDRESS]);
 
   return {
     notes,
