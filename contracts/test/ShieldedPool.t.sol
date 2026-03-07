@@ -127,10 +127,11 @@ contract ShieldedPoolTest is Test {
             address(token),
             address(transferVerifier),
             address(withdrawVerifier),
-            address(poseidon)
+            address(poseidon),
+            1e18
         );
 
-        // Fund alice — mint scaled tokens (contract multiplies by AMOUNT_SCALE = 1e18)
+        // Fund alice — mint scaled tokens (contract multiplies by amountScale = 1e18)
         token.mint(alice, AMOUNT * 10 * 1e18);
         vm.prank(alice);
         token.approve(address(pool), type(uint256).max);
@@ -154,7 +155,8 @@ contract ShieldedPoolTest is Test {
             address(0),
             address(transferVerifier),
             address(withdrawVerifier),
-            address(poseidon)
+            address(poseidon),
+            1e18
         );
     }
 
@@ -164,7 +166,8 @@ contract ShieldedPoolTest is Test {
             address(token),
             address(0),
             address(withdrawVerifier),
-            address(poseidon)
+            address(poseidon),
+            1e18
         );
     }
 
