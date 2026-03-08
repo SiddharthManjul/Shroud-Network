@@ -16,9 +16,6 @@ const inputClass =
 const btnPrimary =
   "w-full rounded-lg bg-[#b0b0b0] px-4 py-2.5 font-medium text-black hover:bg-[#ff1a1a] hover:text-black border border-[#b0b0b0] hover:border-[#ff1a1a] disabled:opacity-40 transition-colors duration-200";
 
-const btnSecondary =
-  "w-full rounded-lg bg-[#b0b0b0] px-4 py-2 text-sm font-medium text-black hover:bg-[#ff1a1a] hover:text-black border border-[#b0b0b0] hover:border-[#ff1a1a] disabled:opacity-40 transition-colors duration-200";
-
 const btnWarning =
   "w-full rounded-lg bg-transparent px-4 py-2 text-sm font-medium text-[#ff1a1a] hover:bg-[#ff1a1a]/10 border border-[#ff1a1a]/40 hover:border-[#ff1a1a] disabled:opacity-40 transition-colors duration-200";
 
@@ -32,7 +29,7 @@ const toggleBtn = (active: boolean) =>
 export function DepositForm() {
   const { ready } = useZkToken();
   const { address, signer, provider } = useWallet();
-  const { notes, saveNote, loading, refreshNotes } = useNotes();
+  const { notes, saveNote } = useNotes();
   const { keypair, deriveKey } = useShieldedKey();
   const { activeToken } = useToken();
 
@@ -150,13 +147,6 @@ export function DepositForm() {
     }
   };
 
-  // Scan for incoming notes — relay first, then indexer, then chain fallback
-  const handleScanNotes = async () => {
-    setStatus("Scanning for incoming notes...");
-    await refreshNotes();
-    setStatus("Scan complete.");
-  };
-
   return (
     <form onSubmit={handleDeposit} className="space-y-4">
       {/* AVAX / WAVAX toggle — only shown when active pool is WAVAX */}
@@ -211,18 +201,6 @@ export function DepositForm() {
           ? "Wrap AVAX & Deposit"
           : "Deposit"}
       </button>
-
-      {/* Scan for incoming notes — uses relay + indexer + chain fallback */}
-      {address && keypair && (
-        <button
-          type="button"
-          onClick={handleScanNotes}
-          disabled={loading}
-          className={btnSecondary}
-        >
-          {loading ? "Scanning..." : "Scan for Incoming Notes"}
-        </button>
-      )}
 
       {/* Recovery button — only shown when there are stuck notes */}
       {pendingNotes.length > 0 && provider && (
