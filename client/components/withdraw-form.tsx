@@ -8,13 +8,11 @@ import { useNotes } from "@/hooks/use-notes";
 import { useShieldedKey } from "@/hooks/use-shielded-key";
 import { useToken } from "@/providers/token-provider";
 import { ProofStatus } from "./proof-status";
+import { CustomSelect } from "./custom-select";
 import type { Note } from "@/lib/zktoken/types";
 
 const inputClass =
   "w-full rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] px-3 py-2 text-[#ff1a1a] placeholder:text-[#444444] focus:border-[#ff1a1a] focus:outline-none transition-colors duration-200";
-
-const selectClass =
-  "w-full rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] px-3 py-2 text-[#ff1a1a] focus:border-[#ff1a1a] focus:outline-none transition-colors duration-200";
 
 const btnPrimary =
   "w-full rounded-lg bg-[#b0b0b0] px-4 py-2.5 font-medium text-black hover:bg-[#ff1a1a] hover:text-black border border-[#b0b0b0] hover:border-[#ff1a1a] disabled:opacity-40 transition-colors duration-200";
@@ -118,18 +116,18 @@ export function WithdrawForm() {
         {unspent.length === 0 ? (
           <p className="text-sm text-[#444444]">No unspent notes. Deposit tokens first.</p>
         ) : (
-          <select
-            value={selectedNoteIdx}
-            onChange={(e) => setSelectedNoteIdx(Number(e.target.value))}
-            className={selectClass}
-          >
-            <option value={-1}>Choose a note...</option>
-            {unspent.map((note, i) => (
-              <option key={note.noteCommitment.toString()} value={i}>
-                {note.amount.toString()} {tokenSymbol} (leaf #{note.leafIndex})
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            value={String(selectedNoteIdx)}
+            options={[
+              { value: "-1", label: "Choose a note..." },
+              ...unspent.map((note, i) => ({
+                value: String(i),
+                label: `${note.amount.toString()} ${tokenSymbol} (leaf #${note.leafIndex})`,
+              })),
+            ]}
+            onChange={(val) => setSelectedNoteIdx(Number(val))}
+            placeholder="Choose a note..."
+          />
         )}
       </div>
 
