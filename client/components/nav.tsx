@@ -13,6 +13,7 @@ const links = [
   { href: "/notes", label: "Notes" },
   { href: "/pools", label: "Pools" },
   { href: "/faucet", label: "Faucet" },
+  { href: "/guide", label: "Guide" },
 ];
 
 export function Nav() {
