@@ -231,6 +231,43 @@ export function useNotes() {
       if (foundNew) {
         persist();
       }
+
+      // Reconcile spent status: check every unspent note's nullifier on-chain
+      if (POOL_ADDRESS) {
+        try {
+          const { Contract, JsonRpcProvider } = await import("ethers");
+          const { SHIELDED_POOL_ABI } = await import(
+            "@/lib/zktoken/abi/shielded-pool"
+          );
+          const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL);
+          const pool = new Contract(POOL_ADDRESS, SHIELDED_POOL_ABI, provider);
+
+          const unspentNotes = storeRef.current
+            .getAll()
+            .filter((n) => !n.spent && n.nullifier !== 0n);
+
+          if (unspentNotes.length > 0) {
+            const checks = await Promise.all(
+              unspentNotes.map((n) =>
+                pool.isSpent(n.nullifier).catch(() => false)
+              )
+            );
+
+            let markedAny = false;
+            for (let i = 0; i < unspentNotes.length; i++) {
+              if (checks[i]) {
+                storeRef.current.markSpent(unspentNotes[i].nullifier);
+                markedAny = true;
+              }
+            }
+            if (markedAny) {
+              persist();
+            }
+          }
+        } catch (err) {
+          console.warn("[use-notes] On-chain nullifier check failed:", err);
+        }
+      }
     } finally {
       setLoading(false);
     }
