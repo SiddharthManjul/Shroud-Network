@@ -1,20 +1,27 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useWallet } from "@/hooks/use-wallet";
 import { useZkToken } from "@/hooks/use-zktoken";
 import { useNotes } from "@/hooks/use-notes";
 import { useShieldedKey } from "@/hooks/use-shielded-key";
 import { useToken } from "@/providers/token-provider";
 import { ProofStatus } from "./proof-status";
+import { CustomSelect } from "./custom-select";
 import type { Note } from "@/lib/zktoken/types";
+
+function ClipboardIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  );
+}
 
 const inputClass =
   "w-full rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] px-3 py-2 text-[#ff1a1a] placeholder:text-[#444444] focus:border-[#ff1a1a] focus:outline-none transition-colors duration-200";
-
-const selectClass =
-  "w-full rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] px-3 py-2 text-[#ff1a1a] focus:border-[#ff1a1a] focus:outline-none transition-colors duration-200";
 
 const btnPrimary =
   "w-full rounded-lg bg-[#b0b0b0] px-4 py-2.5 font-medium text-black hover:bg-[#ff1a1a] hover:text-black border border-[#b0b0b0] hover:border-[#ff1a1a] disabled:opacity-40 transition-colors duration-200";
@@ -38,6 +45,14 @@ export function TransferForm() {
   const [generating, setGenerating] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const copyToClipboard = useCallback((text: string, label: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(label);
+      setTimeout(() => setCopied(null), 1500);
+    });
+  }, []);
 
   const selectedNote: Note | undefined =
     selectedNoteIdx >= 0 ? unspent[selectedNoteIdx] : undefined;
@@ -126,31 +141,64 @@ export function TransferForm() {
         {unspent.length === 0 ? (
           <p className="text-sm text-[#444444]">No unspent notes. Deposit tokens first.</p>
         ) : (
-          <select
-            value={selectedNoteIdx}
-            onChange={(e) => setSelectedNoteIdx(Number(e.target.value))}
-            className={selectClass}
-          >
-            <option value={-1}>Choose a note...</option>
-            {unspent.map((note, i) => (
-              <option key={note.noteCommitment.toString()} value={i}>
-                {note.amount.toString()} {tokenSymbol} (leaf #{note.leafIndex})
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            value={String(selectedNoteIdx)}
+            options={[
+              { value: "-1", label: "Choose a note..." },
+              ...unspent.map((note, i) => ({
+                value: String(i),
+                label: `${note.amount.toString()} ${tokenSymbol} (leaf #${note.leafIndex})`,
+              })),
+            ]}
+            onChange={(val) => setSelectedNoteIdx(Number(val))}
+            placeholder="Choose a note..."
+          />
         )}
       </div>
 
       {/* Show user's own public key for sharing */}
       {keypair && (
-        <div className="rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] p-3 space-y-1">
-          <p className="text-xs text-[#888888]">Your Shielded Public Key (share with senders):</p>
-          <p className="text-xs text-[#ff1a1a] font-mono break-all select-all">
-            X: {keypair.publicKey[0].toString()}
-          </p>
-          <p className="text-xs text-[#ff1a1a] font-mono break-all select-all">
-            Y: {keypair.publicKey[1].toString()}
-          </p>
+        <div className="rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-[#888888]">Your Shielded Public Key (share with senders):</p>
+            <button
+              type="button"
+              onClick={() => copyToClipboard(
+                `${keypair.publicKey[0].toString()}\n${keypair.publicKey[1].toString()}`,
+                "both"
+              )}
+              className="flex items-center gap-1 rounded px-2 py-0.5 text-xs text-[#888888] hover:text-[#ff1a1a] hover:bg-[#ff1a1a]/10 transition-colors duration-200"
+            >
+              <ClipboardIcon />
+              {copied === "both" ? "Copied!" : "Copy Both"}
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <p className="text-xs text-[#ff1a1a] font-mono break-all select-all flex-1">
+              X: {keypair.publicKey[0].toString()}
+            </p>
+            <button
+              type="button"
+              onClick={() => copyToClipboard(keypair.publicKey[0].toString(), "x")}
+              className="shrink-0 rounded p-1 text-[#888888] hover:text-[#ff1a1a] hover:bg-[#ff1a1a]/10 transition-colors duration-200"
+              title="Copy X"
+            >
+              {copied === "x" ? <span className="text-xs">Copied!</span> : <ClipboardIcon />}
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <p className="text-xs text-[#ff1a1a] font-mono break-all select-all flex-1">
+              Y: {keypair.publicKey[1].toString()}
+            </p>
+            <button
+              type="button"
+              onClick={() => copyToClipboard(keypair.publicKey[1].toString(), "y")}
+              className="shrink-0 rounded p-1 text-[#888888] hover:text-[#ff1a1a] hover:bg-[#ff1a1a]/10 transition-colors duration-200"
+              title="Copy Y"
+            >
+              {copied === "y" ? <span className="text-xs">Copied!</span> : <ClipboardIcon />}
+            </button>
+          </div>
         </div>
       )}
 
