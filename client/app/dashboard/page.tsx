@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { useZkToken } from "@/hooks/use-zktoken";
 import { useWallet } from "@/hooks/use-wallet";
 import { useNotes } from "@/hooks/use-notes";
+import { useShieldedKey } from "@/hooks/use-shielded-key";
 import { useToken } from "@/providers/token-provider";
 import { TokenBalances } from "@/components/token-balances";
 import Link from "next/link";
@@ -10,9 +12,11 @@ import Link from "next/link";
 export default function DashboardPage() {
   const { ready, error } = useZkToken();
   const { address, chainId, networkName, wrongNetwork, switchToExpectedNetwork } = useWallet();
-  const { unspent } = useNotes();
+  const { unspent, loading, refreshNotes } = useNotes();
+  const { keypair } = useShieldedKey();
   const { activeToken } = useToken();
   const tokenSymbol = activeToken?.symbol ?? "Token";
+  const [scanStatus, setScanStatus] = useState<string | null>(null);
 
   return (
     <div className="space-y-8">
@@ -92,7 +96,7 @@ export default function DashboardPage() {
       {/* Quick actions */}
       <div>
         <h2 className="text-lg font-semibold text-[#ff1a1a] mb-3">Quick Actions</h2>
-        <div className="grid gap-3 sm:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-5">
           {[
             { href: "/deposit", label: "Deposit", desc: "Lock ERC20 tokens into the shielded pool" },
             { href: "/transfer", label: "Transfer", desc: "Send tokens privately within the pool" },
@@ -108,7 +112,25 @@ export default function DashboardPage() {
               <p className="mt-1 text-sm text-[#888888]">{desc}</p>
             </Link>
           ))}
+          <button
+            onClick={async () => {
+              setScanStatus("Scanning...");
+              await refreshNotes();
+              setScanStatus("Scan complete.");
+              setTimeout(() => setScanStatus(null), 3000);
+            }}
+            disabled={loading || !address || !keypair}
+            className="group rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] p-4 hover:border-[#ff1a1a]/50 hover:bg-[#ff1a1a]/5 transition-all duration-200 text-left disabled:opacity-40"
+          >
+            <p className="font-semibold text-[#ff1a1a]">
+              {loading ? "Scanning..." : "Scan"}
+            </p>
+            <p className="mt-1 text-sm text-[#888888]">Scan for incoming shielded notes</p>
+          </button>
         </div>
+        {scanStatus && !loading && (
+          <p className="mt-2 text-sm text-[#888888]">{scanStatus}</p>
+        )}
       </div>
     </div>
   );
