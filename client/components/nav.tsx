@@ -1,12 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { WalletButton } from "./wallet-button";
 import { TokenSelector } from "./token-selector";
 
-// Dashboard is the root of the app — user lands here after wallet connect.
-// No need to link to it; just provide the other app sections.
 const links = [
   { href: "/deposit", label: "Deposit" },
   { href: "/transfer", label: "Transfer" },
@@ -18,15 +17,16 @@ const links = [
 
 export function Nav() {
   const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <nav className="border-b border-[#2a2a2a] bg-black">
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
         <div className="flex items-center gap-6">
           <Link href="/dashboard" className="text-lg font-bold text-[#ff1a1a] tracking-wide">
             Shroud Network
           </Link>
-          <div className="flex gap-1">
+          <div className="hidden md:flex gap-1">
             {links.map(({ href, label }) => (
               <Link
                 key={href}
@@ -42,11 +42,57 @@ export function Nav() {
             ))}
           </div>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="hidden md:flex items-center gap-4">
           <TokenSelector />
           <WalletButton />
         </div>
+
+        {/* Mobile hamburger */}
+        <button
+          onClick={() => setMobileOpen(!mobileOpen)}
+          className="md:hidden rounded-md p-2 text-[#888888] hover:text-[#ff1a1a] hover:bg-[#ff1a1a]/10 transition-colors duration-200"
+          aria-label="Toggle menu"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            {mobileOpen ? (
+              <>
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </>
+            ) : (
+              <>
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </>
+            )}
+          </svg>
+        </button>
       </div>
+
+      {/* Mobile menu */}
+      {mobileOpen && (
+        <div className="md:hidden border-t border-[#2a2a2a] px-4 py-3 space-y-2">
+          <div className="flex items-center justify-between pb-2 border-b border-[#2a2a2a]">
+            <TokenSelector />
+            <WalletButton />
+          </div>
+          {links.map(({ href, label }) => (
+            <Link
+              key={href}
+              href={href}
+              onClick={() => setMobileOpen(false)}
+              className={`block rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200 ${
+                pathname === href
+                  ? "bg-[#ff1a1a]/10 text-[#ff1a1a] border border-[#ff1a1a]/40"
+                  : "text-[#888888] hover:text-[#ff1a1a] hover:bg-[#ff1a1a]/5"
+              }`}
+            >
+              {label}
+            </Link>
+          ))}
+        </div>
+      )}
     </nav>
   );
 }
