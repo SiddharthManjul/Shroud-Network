@@ -19,7 +19,7 @@ export function WalletButton() {
     return (
       <button
         onClick={handleDisconnect}
-        className={`${baseClass} bg-[#b0b0b0] text-black border-[#b0b0b0] hover:bg-[#ff1a1a] hover:border-[#ff1a1a] hover:text-black font-mono`}
+        className={`${baseClass} bg-[#b0b0b0] text-black border-[#b0b0b0] hover:bg-[#acf901] hover:border-[#acf901] hover:text-black font-mono`}
       >
         {address.slice(0, 6)}...{address.slice(-4)}
       </button>
@@ -30,7 +30,7 @@ export function WalletButton() {
     <button
       onClick={connect}
       disabled={connecting}
-      className={`${baseClass} bg-[#b0b0b0] text-black border-[#b0b0b0] hover:bg-[#ff1a1a] hover:border-[#ff1a1a] hover:text-black disabled:opacity-40`}
+      className={`${baseClass} bg-[#b0b0b0] text-black border-[#b0b0b0] hover:bg-[#acf901] hover:border-[#acf901] hover:text-black disabled:opacity-40`}
     >
       {connecting ? "Connecting..." : "Connect Wallet"}
     </button>
