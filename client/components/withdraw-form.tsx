@@ -12,13 +12,13 @@ import { CustomSelect } from "./custom-select";
 import type { Note } from "@/lib/zktoken/types";
 
 const inputClass =
-  "w-full rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] px-3 py-2 text-[#ff1a1a] placeholder:text-[#444444] focus:border-[#ff1a1a] focus:outline-none transition-colors duration-200";
+  "w-full rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] px-3 py-2 text-[#acf901] placeholder:text-[#444444] focus:border-[#acf901] focus:outline-none transition-colors duration-200";
 
 const btnPrimary =
-  "w-full rounded-lg bg-[#b0b0b0] px-4 py-2.5 font-medium text-black hover:bg-[#ff1a1a] hover:text-black border border-[#b0b0b0] hover:border-[#ff1a1a] disabled:opacity-40 transition-colors duration-200";
+  "w-full rounded-lg bg-[#b0b0b0] px-4 py-2.5 font-medium text-black hover:bg-[#acf901] hover:text-black border border-[#b0b0b0] hover:border-[#acf901] disabled:opacity-40 transition-colors duration-200";
 
 const btnSecondary =
-  "w-full rounded-lg bg-[#b0b0b0] px-4 py-2 text-sm font-medium text-black hover:bg-[#ff1a1a] hover:text-black border border-[#b0b0b0] hover:border-[#ff1a1a] disabled:opacity-40 transition-colors duration-200";
+  "w-full rounded-lg bg-[#b0b0b0] px-4 py-2 text-sm font-medium text-black hover:bg-[#acf901] hover:text-black border border-[#b0b0b0] hover:border-[#acf901] disabled:opacity-40 transition-colors duration-200";
 
 export function WithdrawForm() {
   const { ready } = useZkToken();
@@ -180,7 +180,7 @@ export function WithdrawForm() {
       {txHash && (
         <div className="rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] p-3">
           <p className="text-xs text-[#888888] mb-1">Transaction Hash</p>
-          <p className="text-sm text-[#ff1a1a] font-mono break-all">{txHash}</p>
+          <p className="text-sm text-[#acf901] font-mono break-all">{txHash}</p>
         </div>
       )}
       {status && (
