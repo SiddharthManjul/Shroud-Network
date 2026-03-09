@@ -11,10 +11,10 @@ import { getWavaxAddress } from "@/lib/zktoken/abi/wavax";
 const REGISTRY_ADDRESS = process.env.NEXT_PUBLIC_POOL_REGISTRY_ADDRESS ?? "";
 
 const inputClass =
-  "w-full rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] px-3 py-2 text-[#ff1a1a] placeholder:text-[#444444] focus:border-[#ff1a1a] focus:outline-none transition-colors duration-200";
+  "w-full rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] px-3 py-2 text-[#acf901] placeholder:text-[#444444] focus:border-[#acf901] focus:outline-none transition-colors duration-200";
 
 const btnPrimary =
-  "w-full rounded-lg bg-[#b0b0b0] px-4 py-2.5 font-medium text-black hover:bg-[#ff1a1a] hover:text-black border border-[#b0b0b0] hover:border-[#ff1a1a] disabled:opacity-40 transition-colors duration-200";
+  "w-full rounded-lg bg-[#b0b0b0] px-4 py-2.5 font-medium text-black hover:bg-[#acf901] hover:text-black border border-[#b0b0b0] hover:border-[#acf901] disabled:opacity-40 transition-colors duration-200";
 
 const ERC20_META_ABI = [
   "function symbol() view returns (string)",
@@ -140,7 +140,7 @@ export function CreatePoolForm() {
           <button
             type="button"
             onClick={quickFillWavax}
-            className="rounded-lg bg-[#0d0d0d] px-3 py-1.5 text-sm font-medium text-[#ff1a1a] border border-[#2a2a2a] hover:border-[#ff1a1a]/50 transition-colors duration-200"
+            className="rounded-lg bg-[#0d0d0d] px-3 py-1.5 text-sm font-medium text-[#acf901] border border-[#2a2a2a] hover:border-[#acf901]/50 transition-colors duration-200"
           >
             WAVAX (Wrapped AVAX)
           </button>
@@ -169,7 +169,7 @@ export function CreatePoolForm() {
             disabled={
               lookingUp || !provider || !tokenAddress || tokenAddress.length !== 42
             }
-            className="shrink-0 rounded-lg bg-[#b0b0b0] px-4 py-2 text-sm font-medium text-black hover:bg-[#ff1a1a] hover:text-black border border-[#b0b0b0] hover:border-[#ff1a1a] disabled:opacity-40 transition-colors duration-200"
+            className="shrink-0 rounded-lg bg-[#b0b0b0] px-4 py-2 text-sm font-medium text-black hover:bg-[#acf901] hover:text-black border border-[#b0b0b0] hover:border-[#acf901] disabled:opacity-40 transition-colors duration-200"
           >
             {lookingUp ? "..." : "Lookup"}
           </button>
@@ -181,15 +181,15 @@ export function CreatePoolForm() {
         <div className="rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] p-4 space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-[#888888]">Name</span>
-            <span className="text-[#ff1a1a]">{tokenMeta.name}</span>
+            <span className="text-[#acf901]">{tokenMeta.name}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-[#888888]">Symbol</span>
-            <span className="text-[#ff1a1a]">{tokenMeta.symbol}</span>
+            <span className="text-[#acf901]">{tokenMeta.symbol}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-[#888888]">Decimals</span>
-            <span className="text-[#ff1a1a]">{tokenMeta.decimals}</span>
+            <span className="text-[#acf901]">{tokenMeta.decimals}</span>
           </div>
         </div>
       )}
@@ -205,7 +205,7 @@ export function CreatePoolForm() {
               key={t.token}
               className="flex items-center justify-between text-sm"
             >
-              <span className="text-[#ff1a1a] font-medium">{t.symbol}</span>
+              <span className="text-[#acf901] font-medium">{t.symbol}</span>
               <span className="text-[#666666] font-mono text-xs">
                 {t.token.slice(0, 6)}...{t.token.slice(-4)}
               </span>
