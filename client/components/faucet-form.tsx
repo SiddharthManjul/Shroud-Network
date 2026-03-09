@@ -8,13 +8,13 @@ import { useToken } from "@/providers/token-provider";
 import { TEST_TOKEN_ABI } from "@/lib/zktoken/abi/test-token";
 
 const inputClass =
-  "w-full rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] px-3 py-2 text-[#ff1a1a] placeholder:text-[#444444] focus:border-[#ff1a1a] focus:outline-none transition-colors duration-200";
+  "w-full rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] px-3 py-2 text-[#acf901] placeholder:text-[#444444] focus:border-[#acf901] focus:outline-none transition-colors duration-200";
 
 const btnPrimary =
-  "w-full rounded-lg bg-[#b0b0b0] px-4 py-2.5 font-medium text-black hover:bg-[#ff1a1a] hover:text-black border border-[#b0b0b0] hover:border-[#ff1a1a] disabled:opacity-40 transition-colors duration-200";
+  "w-full rounded-lg bg-[#b0b0b0] px-4 py-2.5 font-medium text-black hover:bg-[#acf901] hover:text-black border border-[#b0b0b0] hover:border-[#acf901] disabled:opacity-40 transition-colors duration-200";
 
 const btnSecondary =
-  "w-full rounded-lg bg-[#b0b0b0] px-4 py-2.5 font-medium text-black hover:bg-[#ff1a1a] hover:text-black border border-[#b0b0b0] hover:border-[#ff1a1a] disabled:opacity-40 transition-colors duration-200";
+  "w-full rounded-lg bg-[#b0b0b0] px-4 py-2.5 font-medium text-black hover:bg-[#acf901] hover:text-black border border-[#b0b0b0] hover:border-[#acf901] disabled:opacity-40 transition-colors duration-200";
 
 export function FaucetForm() {
   const { address, signer } = useWallet();
@@ -98,24 +98,24 @@ export function FaucetForm() {
       <hr className="border-[#2a2a2a]" />
 
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-[#ff1a1a]">Add {tokenSymbol} to Wallet</h2>
+        <h2 className="text-lg font-semibold text-[#acf901]">Add {tokenSymbol} to Wallet</h2>
         <button type="button" onClick={addToWallet} className={btnSecondary}>
           Add to MetaMask
         </button>
         <div className="rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] p-4 space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-[#888888]">Token Address</span>
-            <span className="text-[#ff1a1a] font-mono break-all text-right ml-4">
+            <span className="text-[#acf901] font-mono break-all text-right ml-4">
               {TOKEN_ADDRESS || "Not configured"}
             </span>
           </div>
           <div className="flex justify-between">
             <span className="text-[#888888]">Symbol</span>
-            <span className="text-[#ff1a1a]">{tokenSymbol}</span>
+            <span className="text-[#acf901]">{tokenSymbol}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-[#888888]">Decimals</span>
-            <span className="text-[#ff1a1a]">{tokenDecimals}</span>
+            <span className="text-[#acf901]">{tokenDecimals}</span>
           </div>
         </div>
       </div>
