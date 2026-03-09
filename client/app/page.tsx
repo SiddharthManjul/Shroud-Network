@@ -25,7 +25,7 @@ function LandingNav() {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-[#1a1a1a] bg-black/80 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-        <span className="text-xl font-bold text-[#ff1a1a] tracking-wide uppercase">
+        <span className="text-xl font-bold text-[#acf901] tracking-wide uppercase">
           Shroud Network
         </span>
         <FuturisticButton
@@ -33,9 +33,9 @@ function LandingNav() {
           size="sm"
           onClick={connect}
           disabled={connecting}
-          borderColor="rgba(255,26,26,0.8)"
+          borderColor="rgba(172,249,1,0.8)"
           borderWidth={1.5}
-          className="text-[#ff1a1a] text-xs font-semibold tracking-wider uppercase"
+          className="text-[#acf901] text-xs font-semibold tracking-wider uppercase"
         >
           {connecting ? "Connecting…" : "Connect Wallet"}
         </FuturisticButton>
@@ -56,7 +56,7 @@ function BentoHeader() {
       viewport={{ once: true }}
       className="text-center mb-14 px-4"
     >
-      <h2 className="text-3xl md:text-4xl font-bold text-[#ff1a1a]">
+      <h2 className="text-3xl md:text-4xl font-bold text-[#acf901]">
         Built for Privacy
       </h2>
       <p className="mt-3 text-[#888888] max-w-xl mx-auto">
@@ -75,7 +75,7 @@ function Footer() {
       <div className="mx-auto max-w-6xl">
         <div className="flex flex-col items-center justify-between gap-8 sm:flex-row sm:items-start">
           <div className="max-w-xs text-center sm:text-left">
-            <p className="text-xl font-bold text-[#ff1a1a] uppercase tracking-wide">
+            <p className="text-xl font-bold text-[#acf901] uppercase tracking-wide">
               Shroud Network
             </p>
             <p className="mt-2 text-sm text-[#888888]">
@@ -85,19 +85,19 @@ function Footer() {
 
           <div className="flex gap-10 text-sm text-[#888888]">
             <div className="space-y-2">
-              <p className="font-semibold text-[#ff1a1a]/70 uppercase tracking-wider text-xs mb-3">
+              <p className="font-semibold text-[#acf901]/70 uppercase tracking-wider text-xs mb-3">
                 Protocol
               </p>
-              <a href="https://github.com" className="block hover:text-[#ff1a1a] transition-colors duration-200">GitHub</a>
-              <a href="#" className="block hover:text-[#ff1a1a] transition-colors duration-200">Docs</a>
-              <a href="https://testnet.snowtrace.io" className="block hover:text-[#ff1a1a] transition-colors duration-200">Explorer</a>
+              <a href="https://github.com" className="block hover:text-[#acf901] transition-colors duration-200">GitHub</a>
+              <a href="#" className="block hover:text-[#acf901] transition-colors duration-200">Docs</a>
+              <a href="https://testnet.snowtrace.io" className="block hover:text-[#acf901] transition-colors duration-200">Explorer</a>
             </div>
             <div className="space-y-2">
-              <p className="font-semibold text-[#ff1a1a]/70 uppercase tracking-wider text-xs mb-3">
+              <p className="font-semibold text-[#acf901]/70 uppercase tracking-wider text-xs mb-3">
                 Community
               </p>
-              <a href="https://twitter.com" className="block hover:text-[#ff1a1a] transition-colors duration-200">Twitter</a>
-              <a href="https://discord.gg" className="block hover:text-[#ff1a1a] transition-colors duration-200">Discord</a>
+              <a href="https://twitter.com" className="block hover:text-[#acf901] transition-colors duration-200">Twitter</a>
+              <a href="https://discord.gg" className="block hover:text-[#acf901] transition-colors duration-200">Discord</a>
             </div>
           </div>
         </div>
@@ -107,7 +107,7 @@ function Footer() {
             © 2026 Shroud Network. All rights reserved.
           </p>
           <p className="text-xs text-[#444444]">
-            Built on <span className="text-[#ff1a1a]/60">Avalanche</span> · Powered by ZK-SNARKs
+            Built on <span className="text-[#acf901]/60">Avalanche</span> · Powered by ZK-SNARKs
           </p>
         </div>
       </div>
