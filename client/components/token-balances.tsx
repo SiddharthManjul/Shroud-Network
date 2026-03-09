@@ -77,7 +77,7 @@ export function TokenBalances() {
 
   const cardClass = "rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] p-4";
   const labelClass = "text-sm text-[#888888]";
-  const valueClass = "mt-1 text-lg font-medium text-[#ff1a1a] font-mono";
+  const valueClass = "mt-1 text-lg font-medium text-[#acf901] font-mono";
   const dimClass = "text-[#444444]";
 
   return (
