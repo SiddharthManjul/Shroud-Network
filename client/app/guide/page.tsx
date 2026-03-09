@@ -2,7 +2,7 @@ export default function GuidePage() {
   return (
     <div className="space-y-12 max-w-3xl">
       <div>
-        <h1 className="text-3xl font-bold text-[#ff1a1a] tracking-tight">
+        <h1 className="text-3xl font-bold text-[#acf901] tracking-tight">
           Usage Guide
         </h1>
         <p className="mt-2 text-[#888888] leading-relaxed">
@@ -13,7 +13,7 @@ export default function GuidePage() {
 
       {/* ── Terminology ── */}
       <section className="space-y-4">
-        <h2 className="text-xl font-bold text-[#ff1a1a]">Terminology</h2>
+        <h2 className="text-xl font-bold text-[#acf901]">Terminology</h2>
         <div className="rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] p-5 space-y-3 text-sm leading-relaxed">
           <Term
             name="Shielded Pool"
@@ -52,7 +52,7 @@ export default function GuidePage() {
 
       {/* ── Flow Overview ── */}
       <section className="space-y-4">
-        <h2 className="text-xl font-bold text-[#ff1a1a]">How It All Fits Together</h2>
+        <h2 className="text-xl font-bold text-[#acf901]">How It All Fits Together</h2>
         <div className="rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] p-5 text-sm text-[#888888] leading-relaxed font-mono whitespace-pre-line">
 {`Faucet ──→ Get test tokens (ERC20)
    │
@@ -232,7 +232,7 @@ Withdraw ──→ Exit tokens back to any EVM address`}
 
       {/* ── Footer ── */}
       <div className="rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] p-5 text-sm text-[#888888] leading-relaxed space-y-2">
-        <p className="text-[#ff1a1a] font-semibold">Important Reminders</p>
+        <p className="text-[#acf901] font-semibold">Important Reminders</p>
         <ul className="list-disc list-inside space-y-1">
           <li>
             Your notes are stored locally in your browser. If you clear browser
@@ -262,7 +262,7 @@ Withdraw ──→ Exit tokens back to any EVM address`}
 function Term({ name, desc }: { name: string; desc: string }) {
   return (
     <div>
-      <span className="font-semibold text-[#ff1a1a]">{name}</span>
+      <span className="font-semibold text-[#acf901]">{name}</span>
       <span className="text-[#666666]"> — </span>
       <span className="text-[#888888]">{desc}</span>
     </div>
@@ -290,7 +290,7 @@ function GuideSection({
 }) {
   return (
     <section className="space-y-4">
-      <h2 className="text-xl font-bold text-[#ff1a1a]">
+      <h2 className="text-xl font-bold text-[#acf901]">
         {number}. {title}
       </h2>
 
