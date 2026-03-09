@@ -48,7 +48,7 @@ export const ShroudAnim = () => {
           textAnchor="middle"
           dominantBaseline="middle"
           className="line shroud-text"
-          stroke="#ff1a1a"
+          stroke="#acf901"
           fill="none"
           strokeWidth="3"
           strokeLinecap="round"
