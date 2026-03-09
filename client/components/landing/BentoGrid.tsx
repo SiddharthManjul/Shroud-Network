@@ -92,7 +92,7 @@ const BentoCard = ({
         <path
           d={getPath(dimensions.width, dimensions.height, chamferSize)}
           fill="none"
-          stroke="#ff1a1a"
+          stroke="#acf901"
           strokeWidth={strokeWidth}
         />
       </svg>
@@ -104,7 +104,7 @@ const BentoCard = ({
           background: useMotionTemplate`
             radial-gradient(
               800px circle at ${mouseX}px ${mouseY}px,
-              rgba(255, 26, 26, 0.12),
+              rgba(172, 249, 1, 0.12),
               transparent 80%
             )
           `,
@@ -112,12 +112,12 @@ const BentoCard = ({
       />
 
       <div className="relative z-30 p-8 flex flex-col h-full">
-        <div className="mb-6 inline-flex h-14 w-14 items-center justify-center rounded-xl bg-[#ff1a1a]/10 text-[#ff1a1a] transition-all duration-500 group-hover:scale-110 group-hover:bg-[#ff1a1a]/20">
+        <div className="mb-6 inline-flex h-14 w-14 items-center justify-center rounded-xl bg-[#acf901]/10 text-[#acf901] transition-all duration-500 group-hover:scale-110 group-hover:bg-[#acf901]/20">
           <Icon className="h-8 w-8" />
         </div>
 
         <div className="mt-auto">
-          <h3 className="text-2xl font-bold text-white mb-3 tracking-tight group-hover:text-[#ff1a1a] transition-colors duration-300">
+          <h3 className="text-2xl font-bold text-white mb-3 tracking-tight group-hover:text-[#acf901] transition-colors duration-300">
             {title}
           </h3>
           <p className="text-base text-[#888888] leading-relaxed">
@@ -128,7 +128,7 @@ const BentoCard = ({
 
       {/* Giant ghost icon */}
       <div className="absolute bottom-0 right-0 p-4 opacity-5 transition-transform duration-500 group-hover:scale-[2] group-hover:opacity-10">
-        <Icon className="h-32 w-32 text-[#ff1a1a]" />
+        <Icon className="h-32 w-32 text-[#acf901]" />
       </div>
     </motion.div>
   );
@@ -223,7 +223,7 @@ export const BentoGrid = () => {
             globalChamferSize
           )}
           fill="none"
-          stroke="#ff1a1a"
+          stroke="#acf901"
           strokeWidth={globalStrokeWidth}
         />
       </svg>
