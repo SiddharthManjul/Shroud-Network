@@ -4,7 +4,7 @@ export default function PoolsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[#ff1a1a]">Token Pools</h1>
+        <h1 className="text-2xl font-bold text-[#acf901]">Token Pools</h1>
         <p className="mt-1 text-[#888888]">
           Create a shielded pool for any ERC20 token. Paste the token contract
           address, look it up, and deploy a new pool. Once created, the token
