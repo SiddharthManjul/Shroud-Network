@@ -12,7 +12,7 @@ export function TokenSelector() {
   if (tokens.length <= 1) {
     return (
       <div className="flex items-center gap-1.5 rounded-md border border-[#2a2a2a] bg-[#0d0d0d] px-2.5 py-1">
-        <span className="text-sm font-medium text-[#ff1a1a]">
+        <span className="text-sm font-medium text-[#acf901]">
           {activeToken.symbol}
         </span>
         <span className="text-xs text-[#666666]">
