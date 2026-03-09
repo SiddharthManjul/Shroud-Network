@@ -7,13 +7,13 @@ import { PinInput } from "./pin-input";
 import type { VaultMethod } from "@/lib/zktoken/key-vault";
 
 const btnPrimary =
-  "w-full rounded-lg bg-[#b0b0b0] px-4 py-2.5 font-medium text-black hover:bg-[#ff1a1a] hover:text-black border border-[#b0b0b0] hover:border-[#ff1a1a] disabled:opacity-40 transition-colors duration-200";
+  "w-full rounded-lg bg-[#b0b0b0] px-4 py-2.5 font-medium text-black hover:bg-[#acf901] hover:text-black border border-[#b0b0b0] hover:border-[#acf901] disabled:opacity-40 transition-colors duration-200";
 
 const btnSecondary =
-  "w-full rounded-lg bg-transparent px-4 py-2.5 font-medium text-[#b0b0b0] hover:text-[#ff1a1a] border border-[#2a2a2a] hover:border-[#ff1a1a] disabled:opacity-40 transition-colors duration-200";
+  "w-full rounded-lg bg-transparent px-4 py-2.5 font-medium text-[#b0b0b0] hover:text-[#acf901] border border-[#2a2a2a] hover:border-[#acf901] disabled:opacity-40 transition-colors duration-200";
 
 const btnDanger =
-  "text-sm text-[#444444] hover:text-[#ff1a1a] transition-colors duration-200";
+  "text-sm text-[#444444] hover:text-[#acf901] transition-colors duration-200";
 
 /**
  * VaultGate — Renders either the unlock/setup flow or children (app content).
@@ -69,7 +69,7 @@ export function VaultGate({ children }: { children: React.ReactNode }) {
     <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6">
       <div className="text-center space-y-2">
         <div className="w-16 h-16 mx-auto rounded-full bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ff1a1a" strokeWidth="1.5">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#acf901" strokeWidth="1.5">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
           </svg>
@@ -83,7 +83,7 @@ export function VaultGate({ children }: { children: React.ReactNode }) {
       <button onClick={deriveKey} disabled={deriving} className={btnPrimary} style={{ maxWidth: 320 }}>
         {deriving ? "Signing..." : "Derive Shielded Key"}
       </button>
-      {error && <p className="text-sm text-[#ff1a1a]">{error}</p>}
+      {error && <p className="text-sm text-[#acf901]">{error}</p>}
     </div>
   );
 }
@@ -152,7 +152,7 @@ function SetupScreen({
     <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6">
       <div className="text-center space-y-2">
         <div className="w-16 h-16 mx-auto rounded-full bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ff1a1a" strokeWidth="1.5">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#acf901" strokeWidth="1.5">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
           </svg>
         </div>
@@ -215,7 +215,7 @@ function SetupScreen({
           </p>
           {error && (
             <div className="space-y-3">
-              <p className="text-sm text-[#ff1a1a]">{error}</p>
+              <p className="text-sm text-[#acf901]">{error}</p>
               <button onClick={() => { clearError(); setStep("choose"); }} className={btnSecondary}>
                 Try Again
               </button>
@@ -279,7 +279,7 @@ function UnlockScreen({
     <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6">
       <div className="text-center space-y-2">
         <div className="w-16 h-16 mx-auto rounded-full bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ff1a1a" strokeWidth="1.5">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#acf901" strokeWidth="1.5">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
           </svg>
@@ -301,7 +301,7 @@ function UnlockScreen({
           >
             {loading ? "Verifying..." : "Unlock with Biometrics"}
           </button>
-          {error && <p className="text-sm text-[#ff1a1a] text-center">{error}</p>}
+          {error && <p className="text-sm text-[#acf901] text-center">{error}</p>}
         </div>
       ) : (
         <div className="w-full max-w-xs space-y-4">
