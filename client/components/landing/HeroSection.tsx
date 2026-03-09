@@ -24,13 +24,13 @@ export const HeroSection = () => {
         className="absolute inset-0 opacity-15"
         style={{
           backgroundImage: `
-            linear-gradient(rgba(255,26,26,0.2) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255,26,26,0.2) 1px, transparent 1px)
+            linear-gradient(rgba(172,249,1,0.2) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(172,249,1,0.2) 1px, transparent 1px)
           `,
           backgroundSize: "60px 60px",
         }}
       />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_60%,rgba(255,26,26,0.06),transparent)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_60%,rgba(172,249,1,0.06),transparent)]" />
 
       {/* Content layer */}
       <div className="relative z-10 h-full w-full flex flex-col justify-between">
@@ -46,7 +46,7 @@ export const HeroSection = () => {
               className="text-4xl md:text-6xl text-[#888888] font-medium tracking-wide uppercase"
             >
               Privacy-first transfers on{" "}
-              <span className="text-[#ff1a1a]">Avalanche</span>
+              <span className="text-[#acf901]">Avalanche</span>
             </motion.h2>
           </div>
         </div>
@@ -68,8 +68,8 @@ export const HeroSection = () => {
             <FuturisticButton
               size="lg"
               variant="outline"
-              className="w-full sm:w-auto backdrop-blur-sm bg-black/50 text-[#ff1a1a]"
-              borderColor="rgba(255,26,26,1)"
+              className="w-full sm:w-auto backdrop-blur-sm bg-black/50 text-[#acf901]"
+              borderColor="rgba(172,249,1,1)"
               borderWidth={2}
               onClick={connect}
               disabled={connecting}
@@ -87,7 +87,7 @@ export const HeroSection = () => {
               size="lg"
               variant="outline"
               className="w-full sm:w-auto backdrop-blur-sm bg-black/30 text-[#888888]"
-              borderColor="rgba(255,26,26,0.4)"
+              borderColor="rgba(172,249,1,0.4)"
               borderWidth={1.5}
               onClick={() =>
                 document
