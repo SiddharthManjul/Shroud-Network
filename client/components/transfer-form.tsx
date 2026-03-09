@@ -21,13 +21,13 @@ function ClipboardIcon({ className }: { className?: string }) {
 }
 
 const inputClass =
-  "w-full rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] px-3 py-2 text-[#ff1a1a] placeholder:text-[#444444] focus:border-[#ff1a1a] focus:outline-none transition-colors duration-200";
+  "w-full rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] px-3 py-2 text-[#acf901] placeholder:text-[#444444] focus:border-[#acf901] focus:outline-none transition-colors duration-200";
 
 const btnPrimary =
-  "w-full rounded-lg bg-[#b0b0b0] px-4 py-2.5 font-medium text-black hover:bg-[#ff1a1a] hover:text-black border border-[#b0b0b0] hover:border-[#ff1a1a] disabled:opacity-40 transition-colors duration-200";
+  "w-full rounded-lg bg-[#b0b0b0] px-4 py-2.5 font-medium text-black hover:bg-[#acf901] hover:text-black border border-[#b0b0b0] hover:border-[#acf901] disabled:opacity-40 transition-colors duration-200";
 
 const btnSecondary =
-  "w-full rounded-lg bg-[#b0b0b0] px-4 py-2 text-sm font-medium text-black hover:bg-[#ff1a1a] hover:text-black border border-[#b0b0b0] hover:border-[#ff1a1a] disabled:opacity-40 transition-colors duration-200";
+  "w-full rounded-lg bg-[#b0b0b0] px-4 py-2 text-sm font-medium text-black hover:bg-[#acf901] hover:text-black border border-[#b0b0b0] hover:border-[#acf901] disabled:opacity-40 transition-colors duration-200";
 
 export function TransferForm() {
   const { ready } = useZkToken();
@@ -167,33 +167,33 @@ export function TransferForm() {
                 `${keypair.publicKey[0].toString()}\n${keypair.publicKey[1].toString()}`,
                 "both"
               )}
-              className="flex items-center gap-1 rounded px-2 py-0.5 text-xs text-[#888888] hover:text-[#ff1a1a] hover:bg-[#ff1a1a]/10 transition-colors duration-200"
+              className="flex items-center gap-1 rounded px-2 py-0.5 text-xs text-[#888888] hover:text-[#acf901] hover:bg-[#acf901]/10 transition-colors duration-200"
             >
               <ClipboardIcon />
               {copied === "both" ? "Copied!" : "Copy Both"}
             </button>
           </div>
           <div className="flex items-center gap-2">
-            <p className="text-xs text-[#ff1a1a] font-mono break-all select-all flex-1">
+            <p className="text-xs text-[#acf901] font-mono break-all select-all flex-1">
               X: {keypair.publicKey[0].toString()}
             </p>
             <button
               type="button"
               onClick={() => copyToClipboard(keypair.publicKey[0].toString(), "x")}
-              className="shrink-0 rounded p-1 text-[#888888] hover:text-[#ff1a1a] hover:bg-[#ff1a1a]/10 transition-colors duration-200"
+              className="shrink-0 rounded p-1 text-[#888888] hover:text-[#acf901] hover:bg-[#acf901]/10 transition-colors duration-200"
               title="Copy X"
             >
               {copied === "x" ? <span className="text-xs">Copied!</span> : <ClipboardIcon />}
             </button>
           </div>
           <div className="flex items-center gap-2">
-            <p className="text-xs text-[#ff1a1a] font-mono break-all select-all flex-1">
+            <p className="text-xs text-[#acf901] font-mono break-all select-all flex-1">
               Y: {keypair.publicKey[1].toString()}
             </p>
             <button
               type="button"
               onClick={() => copyToClipboard(keypair.publicKey[1].toString(), "y")}
-              className="shrink-0 rounded p-1 text-[#888888] hover:text-[#ff1a1a] hover:bg-[#ff1a1a]/10 transition-colors duration-200"
+              className="shrink-0 rounded p-1 text-[#888888] hover:text-[#acf901] hover:bg-[#acf901]/10 transition-colors duration-200"
               title="Copy Y"
             >
               {copied === "y" ? <span className="text-xs">Copied!</span> : <ClipboardIcon />}
@@ -260,7 +260,7 @@ export function TransferForm() {
       {txHash && (
         <div className="rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] p-3">
           <p className="text-xs text-[#888888] mb-1">Transaction Hash</p>
-          <p className="text-sm text-[#ff1a1a] font-mono break-all">{txHash}</p>
+          <p className="text-sm text-[#acf901] font-mono break-all">{txHash}</p>
         </div>
       )}
       {status && (
