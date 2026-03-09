@@ -99,8 +99,8 @@ export function PinInput({ length = 6, onComplete, error, disabled }: PinInputPr
               w-11 h-14 text-center text-xl font-mono rounded-lg border
               bg-[#0d0d0d] focus:outline-none transition-colors duration-200
               ${error
-                ? "border-[#ff1a1a] text-[#ff1a1a]"
-                : "border-[#2a2a2a] text-[#ff1a1a] focus:border-[#ff1a1a]"
+                ? "border-[#acf901] text-[#acf901]"
+                : "border-[#2a2a2a] text-[#acf901] focus:border-[#acf901]"
               }
               ${disabled ? "opacity-40" : ""}
             `}
@@ -108,7 +108,7 @@ export function PinInput({ length = 6, onComplete, error, disabled }: PinInputPr
         ))}
       </div>
       {error && (
-        <p className="text-center text-sm text-[#ff1a1a]">{error}</p>
+        <p className="text-center text-sm text-[#acf901]">{error}</p>
       )}
     </div>
   );
