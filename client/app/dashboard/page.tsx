@@ -21,7 +21,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-[#ff1a1a] tracking-tight">Dashboard</h1>
+        <h1 className="text-3xl font-bold text-[#acf901] tracking-tight">Dashboard</h1>
         <p className="mt-1 text-[#888888]">
           Shroud Network shielded pool — private token transfers on Avalanche
         </p>
@@ -33,9 +33,9 @@ export default function DashboardPage() {
           <p className="text-sm text-[#888888]">WASM Status</p>
           <p className="mt-1 text-lg font-medium">
             {error ? (
-              <span className="text-[#ff1a1a]">Error</span>
+              <span className="text-[#acf901]">Error</span>
             ) : ready ? (
-              <span className="text-[#ff1a1a]">Ready</span>
+              <span className="text-[#acf901]">Ready</span>
             ) : (
               <span className="text-yellow-500">Loading...</span>
             )}
@@ -46,7 +46,7 @@ export default function DashboardPage() {
           <p className="text-sm text-[#888888]">Wallet</p>
           <p className="mt-1 text-lg font-medium font-mono truncate">
             {address ? (
-              <span className="text-[#ff1a1a]">
+              <span className="text-[#acf901]">
                 {address.slice(0, 6)}...{address.slice(-4)}
               </span>
             ) : (
@@ -62,7 +62,7 @@ export default function DashboardPage() {
 
         <div className="rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] p-4">
           <p className="text-sm text-[#888888]">Shielded Notes</p>
-          <p className="mt-1 text-lg font-medium text-[#ff1a1a]">
+          <p className="mt-1 text-lg font-medium text-[#acf901]">
             {unspent.length} unspent
           </p>
           <p className="mt-0.5 text-sm font-mono text-[#888888]">
@@ -83,7 +83,7 @@ export default function DashboardPage() {
           </p>
           <button
             onClick={switchToExpectedNetwork}
-            className="rounded-lg bg-[#b0b0b0] px-3 py-1.5 text-sm font-medium text-black hover:bg-[#ff1a1a] hover:text-black transition-colors duration-200 border border-[#b0b0b0] hover:border-[#ff1a1a]"
+            className="rounded-lg bg-[#b0b0b0] px-3 py-1.5 text-sm font-medium text-black hover:bg-[#acf901] hover:text-black transition-colors duration-200 border border-[#b0b0b0] hover:border-[#acf901]"
           >
             Switch Network
           </button>
@@ -95,7 +95,7 @@ export default function DashboardPage() {
 
       {/* Quick actions */}
       <div>
-        <h2 className="text-lg font-semibold text-[#ff1a1a] mb-3">Quick Actions</h2>
+        <h2 className="text-lg font-semibold text-[#acf901] mb-3">Quick Actions</h2>
         <div className="grid gap-3 sm:grid-cols-5">
           {[
             { href: "/deposit", label: "Deposit", desc: "Lock ERC20 tokens into the shielded pool" },
@@ -106,9 +106,9 @@ export default function DashboardPage() {
             <Link
               key={href}
               href={href}
-              className="group rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] p-4 hover:border-[#ff1a1a]/50 hover:bg-[#ff1a1a]/5 transition-all duration-200"
+              className="group rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] p-4 hover:border-[#acf901]/50 hover:bg-[#acf901]/5 transition-all duration-200"
             >
-              <p className="font-semibold text-[#ff1a1a]">{label}</p>
+              <p className="font-semibold text-[#acf901]">{label}</p>
               <p className="mt-1 text-sm text-[#888888]">{desc}</p>
             </Link>
           ))}
@@ -120,9 +120,9 @@ export default function DashboardPage() {
               setTimeout(() => setScanStatus(null), 3000);
             }}
             disabled={loading || !address || !keypair}
-            className="group rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] p-4 hover:border-[#ff1a1a]/50 hover:bg-[#ff1a1a]/5 transition-all duration-200 text-left disabled:opacity-40"
+            className="group rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] p-4 hover:border-[#acf901]/50 hover:bg-[#acf901]/5 transition-all duration-200 text-left disabled:opacity-40"
           >
-            <p className="font-semibold text-[#ff1a1a]">
+            <p className="font-semibold text-[#acf901]">
               {loading ? "Scanning..." : "Scan"}
             </p>
             <p className="mt-1 text-sm text-[#888888]">Scan for incoming shielded notes</p>
