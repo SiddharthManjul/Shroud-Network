@@ -11,19 +11,19 @@ import { useToken } from "@/providers/token-provider";
 import { getWavaxAddress, WAVAX_ABI } from "@/lib/zktoken/abi/wavax";
 
 const inputClass =
-  "w-full rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] px-3 py-2 text-[#ff1a1a] placeholder:text-[#444444] focus:border-[#ff1a1a] focus:outline-none transition-colors duration-200";
+  "w-full rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] px-3 py-2 text-[#acf901] placeholder:text-[#444444] focus:border-[#acf901] focus:outline-none transition-colors duration-200";
 
 const btnPrimary =
-  "w-full rounded-lg bg-[#b0b0b0] px-4 py-2.5 font-medium text-black hover:bg-[#ff1a1a] hover:text-black border border-[#b0b0b0] hover:border-[#ff1a1a] disabled:opacity-40 transition-colors duration-200";
+  "w-full rounded-lg bg-[#b0b0b0] px-4 py-2.5 font-medium text-black hover:bg-[#acf901] hover:text-black border border-[#b0b0b0] hover:border-[#acf901] disabled:opacity-40 transition-colors duration-200";
 
 const btnWarning =
-  "w-full rounded-lg bg-transparent px-4 py-2 text-sm font-medium text-[#ff1a1a] hover:bg-[#ff1a1a]/10 border border-[#ff1a1a]/40 hover:border-[#ff1a1a] disabled:opacity-40 transition-colors duration-200";
+  "w-full rounded-lg bg-transparent px-4 py-2 text-sm font-medium text-[#acf901] hover:bg-[#acf901]/10 border border-[#acf901]/40 hover:border-[#acf901] disabled:opacity-40 transition-colors duration-200";
 
 const toggleBtn = (active: boolean) =>
   `flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-200 ${
     active
-      ? "bg-[#ff1a1a]/10 text-[#ff1a1a] border border-[#ff1a1a]/40"
-      : "bg-[#0d0d0d] text-[#888888] border border-[#2a2a2a] hover:text-[#ff1a1a] hover:border-[#ff1a1a]/30"
+      ? "bg-[#acf901]/10 text-[#acf901] border border-[#acf901]/40"
+      : "bg-[#0d0d0d] text-[#888888] border border-[#2a2a2a] hover:text-[#acf901] hover:border-[#acf901]/30"
   }`;
 
 export function DepositForm() {
