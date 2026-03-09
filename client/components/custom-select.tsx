@@ -73,8 +73,8 @@ export function CustomSelect({
   const selected = options.find((o) => o.value === value);
 
   const triggerClass = compact
-    ? "flex items-center justify-between gap-2 rounded-md border border-[#2a2a2a] bg-[#0d0d0d] px-2.5 py-1 text-sm cursor-pointer hover:border-[#ff1a1a]/50 transition-colors duration-200"
-    : "flex items-center justify-between w-full rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] px-3 py-2 cursor-pointer hover:border-[#ff1a1a]/50 transition-colors duration-200";
+    ? "flex items-center justify-between gap-2 rounded-md border border-[#2a2a2a] bg-[#0d0d0d] px-2.5 py-1 text-sm cursor-pointer hover:border-[#acf901]/50 transition-colors duration-200"
+    : "flex items-center justify-between w-full rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] px-3 py-2 cursor-pointer hover:border-[#acf901]/50 transition-colors duration-200";
 
   return (
     <div ref={ref} className={`relative ${className}`}>
@@ -82,9 +82,9 @@ export function CustomSelect({
         type="button"
         onClick={() => !disabled && setOpen(!open)}
         disabled={disabled}
-        className={`${triggerClass} ${disabled ? "opacity-40 cursor-not-allowed" : ""} ${open ? "border-[#ff1a1a]" : ""}`}
+        className={`${triggerClass} ${disabled ? "opacity-40 cursor-not-allowed" : ""} ${open ? "border-[#acf901]" : ""}`}
       >
-        <span className={`truncate ${selected ? "text-[#ff1a1a]" : "text-[#444444]"} ${compact ? "text-sm" : ""}`}>
+        <span className={`truncate ${selected ? "text-[#acf901]" : "text-[#444444]"} ${compact ? "text-sm" : ""}`}>
           {selected?.label ?? placeholder}
         </span>
         <ChevronIcon open={open} />
@@ -102,8 +102,8 @@ export function CustomSelect({
               }}
               className={`flex w-full items-center px-3 py-2 text-sm transition-colors duration-150 ${
                 option.value === value
-                  ? "bg-[#ff1a1a]/10 text-[#ff1a1a]"
-                  : "text-[#888888] hover:bg-[#ff1a1a]/5 hover:text-[#ff1a1a]"
+                  ? "bg-[#acf901]/10 text-[#acf901]"
+                  : "text-[#888888] hover:bg-[#acf901]/5 hover:text-[#acf901]"
               }`}
             >
               {option.label}
