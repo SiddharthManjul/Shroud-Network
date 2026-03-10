@@ -80,19 +80,44 @@ export function WithdrawForm() {
 
       setStatus("Syncing Merkle tree...");
       const { relayWithdraw } = await import("@/lib/zktoken/transaction");
+      const {
+        createWithdrawPendingTx,
+        updatePendingTx,
+        removePendingTx,
+      } = await import("@/lib/zktoken/pending-tx");
+      const { encodeNote: encNote } = await import("@/lib/zktoken/note");
+
+      // Persist intent before submission so reload can reconcile
+      const pendingId = createWithdrawPendingTx(selectedNote, POOL_ADDRESS);
 
       setStatus("Generating ZK proof (this may take a moment)...");
-      const result = await relayWithdraw({
-        provider: provider as never,
-        poolAddress: POOL_ADDRESS,
-        inputNote: selectedNote,
-        withdrawAmount,
-        recipient,
-        senderPublicKey: kp.publicKey,
-        senderPrivateKey: kp.privateKey,
-        wasmPath: "/circuits/withdraw.wasm",
-        zkeyPath: "/circuits/withdraw_final.zkey",
-        paymasterAddress: activeToken?.paymaster,
+      let result;
+      try {
+        result = await relayWithdraw({
+          provider: provider as never,
+          poolAddress: POOL_ADDRESS,
+          inputNote: selectedNote,
+          withdrawAmount,
+          recipient,
+          senderPublicKey: kp.publicKey,
+          senderPrivateKey: kp.privateKey,
+          wasmPath: "/circuits/withdraw.wasm",
+          zkeyPath: "/circuits/withdraw_final.zkey",
+          paymasterAddress: activeToken?.paymaster,
+        });
+      } catch (relayErr) {
+        removePendingTx(pendingId);
+        throw relayErr;
+      }
+
+      // Relay confirmed — update pending tx with change note before reconciling
+      updatePendingTx(pendingId, {
+        status: "submitted",
+        txHash: result.relay.txHash,
+        changeNoteEncoded:
+          result.changeNote && result.changeNote.amount > 0n
+            ? encNote(result.changeNote)
+            : undefined,
       });
 
       setTxHash(result.relay.txHash);
@@ -101,6 +126,9 @@ export function WithdrawForm() {
       if (result.changeNote && result.changeNote.amount > 0n) {
         saveNote(result.changeNote);
       }
+
+      // Notes reconciled — safe to remove pending record
+      removePendingTx(pendingId);
 
       setStatus("Withdrawal confirmed via relay!");
       setSelectedNoteIdx(-1);
