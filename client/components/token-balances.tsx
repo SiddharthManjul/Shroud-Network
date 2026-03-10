@@ -111,8 +111,9 @@ export function TokenBalances() {
           )}
         </p>
         {tokenInfo && (
-          <p className="mt-0.5 text-xs text-[#666666] font-mono truncate">
-            {tokenInfo.address}
+          <p className="mt-0.5 text-xs text-[#666666] font-mono">
+            <span className="sm:hidden">{tokenInfo.address.slice(0, 6)}...{tokenInfo.address.slice(-4)}</span>
+            <span className="hidden sm:inline truncate block">{tokenInfo.address}</span>
           </p>
         )}
       </div>
