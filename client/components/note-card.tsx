@@ -25,13 +25,13 @@ export function NoteCard({ note }: { note: Note }) {
           {note.spent ? "Spent" : "Unspent"}
         </span>
       </div>
-      <div className="mt-2">
-        <span className="text-2xl font-bold text-[#acf901]">
+      <div className="mt-2 min-w-0">
+        <span className="text-2xl font-bold text-[#acf901] break-all">
           {note.amount.toString()}
         </span>
         <span className="ml-2 text-sm text-[#888888]">tokens</span>
       </div>
-      <div className="mt-2 text-xs font-mono text-[#444444] truncate">
+      <div className="mt-2 text-xs font-mono text-[#444444] truncate min-w-0">
         commitment: 0x{note.noteCommitment.toString(16).slice(0, 16)}...
       </div>
     </div>
