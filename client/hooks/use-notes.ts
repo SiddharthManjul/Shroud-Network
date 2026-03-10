@@ -40,6 +40,53 @@ export function useNotes() {
   const TOKEN_ADDRESS = activeToken?.token ?? "";
   const POOL_ADDRESS = activeToken?.pool ?? "";
 
+  // Reconcile any pending (in-flight) transactions from a prior session
+  const reconciledRef = useRef(false);
+  useEffect(() => {
+    if (!keypair || !POOL_ADDRESS || reconciledRef.current) return;
+    reconciledRef.current = true;
+
+    (async () => {
+      try {
+        const { reconcilePendingTxs } = await import(
+          "@/lib/zktoken/pending-tx"
+        );
+        const { Contract, JsonRpcProvider } = await import("ethers");
+        const { SHIELDED_POOL_ABI } = await import(
+          "@/lib/zktoken/abi/shielded-pool"
+        );
+
+        const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL);
+
+        const count = await reconcilePendingTxs({
+          checkNullifier: async (nullifier, poolAddr) => {
+            const pool = new Contract(poolAddr, SHIELDED_POOL_ABI, provider);
+            return (await pool.isSpent(nullifier)) as boolean;
+          },
+          onMarkSpent: (nullifier) => {
+            storeRef.current.markSpent(nullifier);
+          },
+          onSaveNote: (note) => {
+            storeRef.current.save(note);
+          },
+        });
+
+        if (count > 0) {
+          console.log(`[use-notes] Reconciled ${count} pending transaction(s)`);
+          const all = storeRef.current.getAll();
+          const serialized = all.map((n) => encodeNote(n));
+          const key = currentKeyRef.current;
+          if (key) {
+            localStorage.setItem(key, JSON.stringify(serialized));
+          }
+          setNotes([...all]);
+        }
+      } catch (err) {
+        console.warn("[use-notes] Pending tx reconciliation failed:", err);
+      }
+    })();
+  }, [keypair, POOL_ADDRESS]);
+
   // Hydrate from localStorage cache when keypair or active token changes
   useEffect(() => {
     storeRef.current.clear();
