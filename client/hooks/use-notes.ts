@@ -282,5 +282,6 @@ export function useNotes() {
     getUnspent,
     clearAll,
     refreshNotes,
+    persist,
   };
 }
