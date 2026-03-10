@@ -99,19 +99,44 @@ export function TransferForm() {
 
       setStatus("Syncing Merkle tree...");
       const { relayTransfer } = await import("@/lib/zktoken/transaction");
+      const {
+        createTransferPendingTx,
+        updatePendingTx,
+        removePendingTx,
+      } = await import("@/lib/zktoken/pending-tx");
+      const { encodeNote: encNote } = await import("@/lib/zktoken/note");
+
+      // Persist intent before submission so reload can reconcile
+      const pendingId = createTransferPendingTx(selectedNote, POOL_ADDRESS);
 
       setStatus("Generating ZK proof (this may take a moment)...");
-      const result = await relayTransfer({
-        provider: provider as never,
-        poolAddress: POOL_ADDRESS,
-        inputNote: selectedNote,
-        transferAmount,
-        recipientPublicKey,
-        senderPublicKey: kp.publicKey,
-        senderPrivateKey: kp.privateKey,
-        wasmPath: "/circuits/transfer.wasm",
-        zkeyPath: "/circuits/transfer_final.zkey",
-        paymasterAddress: activeToken?.paymaster,
+      let result;
+      try {
+        result = await relayTransfer({
+          provider: provider as never,
+          poolAddress: POOL_ADDRESS,
+          inputNote: selectedNote,
+          transferAmount,
+          recipientPublicKey,
+          senderPublicKey: kp.publicKey,
+          senderPrivateKey: kp.privateKey,
+          wasmPath: "/circuits/transfer.wasm",
+          zkeyPath: "/circuits/transfer_final.zkey",
+          paymasterAddress: activeToken?.paymaster,
+        });
+      } catch (relayErr) {
+        removePendingTx(pendingId);
+        throw relayErr;
+      }
+
+      // Relay confirmed — update pending tx with change note before reconciling
+      updatePendingTx(pendingId, {
+        status: "submitted",
+        txHash: result.relay.txHash,
+        changeNoteEncoded:
+          result.changeNote && result.changeNote.amount > 0n
+            ? encNote(result.changeNote)
+            : undefined,
       });
 
       setTxHash(result.relay.txHash);
@@ -120,6 +145,9 @@ export function TransferForm() {
       if (result.changeNote && result.changeNote.amount > 0n) {
         saveNote(result.changeNote);
       }
+
+      // Notes reconciled — safe to remove pending record
+      removePendingTx(pendingId);
 
       setStatus("Transfer confirmed via relay!");
       setSelectedNoteIdx(-1);
