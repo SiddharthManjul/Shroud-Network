@@ -73,7 +73,7 @@ export default function DashboardPage() {
 
       {/* Wrong network warning */}
       {wrongNetwork && (
-        <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4 flex items-center justify-between">
+        <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <p className="text-sm text-yellow-400">
             Wrong network — please switch to{" "}
             {process.env.NEXT_PUBLIC_CHAIN_ID === "43114"
@@ -96,7 +96,7 @@ export default function DashboardPage() {
       {/* Quick actions */}
       <div>
         <h2 className="text-lg font-semibold text-[#acf901] mb-3">Quick Actions</h2>
-        <div className="grid gap-3 sm:grid-cols-5">
+        <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
           {[
             { href: "/deposit", label: "Deposit", desc: "Lock ERC20 tokens into the shielded pool" },
             { href: "/transfer", label: "Transfer", desc: "Send tokens privately within the pool" },
