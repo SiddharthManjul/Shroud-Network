@@ -74,7 +74,7 @@ export function Nav() {
       {/* Mobile menu */}
       {mobileOpen && (
         <div className="md:hidden border-t border-[#2a2a2a] px-4 py-3 space-y-2">
-          <div className="flex items-center justify-between pb-2 border-b border-[#2a2a2a]">
+          <div className="flex items-center justify-between gap-2 pb-2 border-b border-[#2a2a2a] flex-wrap">
             <TokenSelector />
             <WalletButton />
           </div>
