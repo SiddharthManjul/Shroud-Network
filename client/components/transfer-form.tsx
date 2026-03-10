@@ -186,8 +186,8 @@ export function TransferForm() {
 
       {/* Show user's own public key for sharing */}
       {keypair && (
-        <div className="rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] p-3 space-y-2">
-          <div className="flex items-center justify-between">
+        <div className="rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] p-3 space-y-2 min-w-0 overflow-hidden">
+          <div className="flex items-start justify-between gap-2">
             <p className="text-xs text-[#888888]">Your Shielded Public Key (share with senders):</p>
             <button
               type="button"
@@ -195,14 +195,14 @@ export function TransferForm() {
                 `${keypair.publicKey[0].toString()}\n${keypair.publicKey[1].toString()}`,
                 "both"
               )}
-              className="flex items-center gap-1 rounded px-2 py-0.5 text-xs text-[#888888] hover:text-[#acf901] hover:bg-[#acf901]/10 transition-colors duration-200"
+              className="flex items-center gap-1 shrink-0 rounded px-2 py-0.5 text-xs text-[#888888] hover:text-[#acf901] hover:bg-[#acf901]/10 transition-colors duration-200"
             >
               <ClipboardIcon />
               {copied === "both" ? "Copied!" : "Copy Both"}
             </button>
           </div>
-          <div className="flex items-center gap-2">
-            <p className="text-xs text-[#acf901] font-mono break-all select-all flex-1">
+          <div className="flex items-start gap-2 min-w-0">
+            <p className="text-xs text-[#acf901] font-mono break-all select-all min-w-0 flex-1">
               X: {keypair.publicKey[0].toString()}
             </p>
             <button
@@ -214,8 +214,8 @@ export function TransferForm() {
               {copied === "x" ? <span className="text-xs">Copied!</span> : <ClipboardIcon />}
             </button>
           </div>
-          <div className="flex items-center gap-2">
-            <p className="text-xs text-[#acf901] font-mono break-all select-all flex-1">
+          <div className="flex items-start gap-2 min-w-0">
+            <p className="text-xs text-[#acf901] font-mono break-all select-all min-w-0 flex-1">
               Y: {keypair.publicKey[1].toString()}
             </p>
             <button
