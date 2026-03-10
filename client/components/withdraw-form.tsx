@@ -36,6 +36,13 @@ export function WithdrawForm() {
   const [status, setStatus] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
 
+  const ROUND_AMOUNTS = ["100", "500", "1000", "5000", "10000"];
+
+  const isNonRoundAmount =
+    amount.trim() !== "" &&
+    /^\d+$/.test(amount.trim()) &&
+    !ROUND_AMOUNTS.includes(amount.trim());
+
   const selectedNote: Note | undefined =
     selectedNoteIdx >= 0 ? unspent[selectedNoteIdx] : undefined;
 
@@ -157,6 +164,31 @@ export function WithdrawForm() {
           placeholder={selectedNote ? `Max: ${selectedNote.amount}` : "500"}
           className={inputClass}
         />
+        <div className="mt-2 flex gap-1.5 flex-wrap">
+          {ROUND_AMOUNTS.filter(
+            (v) => !selectedNote || BigInt(v) <= selectedNote.amount
+          ).map((v) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setAmount(v)}
+              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors duration-200 ${
+                amount === v
+                  ? "bg-[#acf901]/15 text-[#acf901] border border-[#acf901]/50"
+                  : "bg-[#0d0d0d] text-[#888888] border border-[#2a2a2a] hover:text-[#acf901] hover:border-[#acf901]/30"
+              }`}
+            >
+              {Number(v).toLocaleString()}
+            </button>
+          ))}
+        </div>
+        {isNonRoundAmount && (
+          <p className="mt-2 text-xs text-yellow-500/90">
+            Withdrawing a non-round amount can link your deposit and withdrawal.
+            Use a round denomination to preserve anonymity, and withdraw the
+            remainder separately.
+          </p>
+        )}
       </div>
 
       <ProofStatus generating={generating} />
