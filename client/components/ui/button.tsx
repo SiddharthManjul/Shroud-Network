@@ -119,6 +119,8 @@ function FuturisticButton({
     </svg>
   ) : null
 
+  const chamferClip = `polygon(0 0, calc(100% - ${chamferSize}px) 0, 100% ${chamferSize}px, 100% 100%, ${chamferSize}px 100%, 0 calc(100% - ${chamferSize}px))`
+
   return (
     <Comp
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -128,15 +130,27 @@ function FuturisticButton({
       data-size={size}
       className={cn(
         futuristicButtonVariants({ variant, size }),
+        "bg-transparent!",
         className
       )}
-      style={{
-        clipPath: `polygon(0 0, calc(100% - ${chamferSize}px) 0, 100% ${chamferSize}px, 100% 100%, ${chamferSize}px 100%, 0 calc(100% - ${chamferSize}px))`,
-      }}
       {...props}
     >
+      {/* Visual layer with clip — does not affect touch target */}
+      <span
+        className="absolute inset-0 pointer-events-none"
+        style={{ clipPath: chamferClip }}
+      >
+        <span className={cn(
+          "absolute inset-0",
+          variant === "outline" ? "bg-background dark:bg-input/30" :
+          variant === "destructive" ? "bg-destructive" :
+          variant === "secondary" ? "bg-secondary" :
+          variant === "ghost" || variant === "link" ? "bg-transparent" :
+          "bg-primary"
+        )} />
+      </span>
       {borderSvg}
-      {children}
+      <span className="relative z-10 flex items-center gap-2">{children}</span>
     </Comp>
   )
 }
