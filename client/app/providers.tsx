@@ -5,6 +5,7 @@ import { WalletProvider } from "@/providers/wallet-provider";
 import { ShieldedKeyProvider } from "@/providers/shielded-key-provider";
 import { TokenProvider } from "@/providers/token-provider";
 import { Nav } from "@/components/nav";
+import { NewsTicker } from "@/components/news-ticker";
 import { VaultGate } from "@/components/vault-gate";
 import { useWallet } from "@/hooks/use-wallet";
 import { useRouter, usePathname } from "next/navigation";
@@ -39,7 +40,12 @@ function AppShell({ children }: { children: ReactNode }) {
     <>
       <WalletRedirect />
       {/* Only show the authenticated nav on app pages */}
-      {!isLanding && <Nav />}
+      {!isLanding && (
+        <>
+          <Nav />
+          <NewsTicker />
+        </>
+      )}
       {isLanding ? (
         <>{children}</>
       ) : (
