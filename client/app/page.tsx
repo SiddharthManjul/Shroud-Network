@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { useWallet } from "@/hooks/use-wallet";
 import { FuturisticButton } from "@/components/ui/button";
+import Image from "next/image";
 import { HeroSection } from "@/components/landing/HeroSection";
 import { BentoGrid } from "@/components/landing/BentoGrid";
 import { ScrollSections } from "@/components/landing/ScrollSections";
@@ -25,7 +26,8 @@ function LandingNav() {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-[#1a1a1a] bg-black/80 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-        <span className="text-xl font-bold text-[#acf901] tracking-wide uppercase">
+        <span className="flex items-center gap-2 text-xl font-bold text-[#acf901] tracking-wide uppercase">
+          <Image src="/schrodingerlabs.png" alt="Shroud Network" width={28} height={28} className="rounded-sm" />
           Shroud Network
         </span>
         <FuturisticButton
@@ -75,11 +77,14 @@ function Footer() {
       <div className="mx-auto max-w-6xl">
         <div className="flex flex-col items-center justify-between gap-8 sm:flex-row sm:items-start">
           <div className="max-w-xs text-center sm:text-left">
-            <p className="text-xl font-bold text-[#acf901] uppercase tracking-wide">
-              Shroud Network
-            </p>
+            <div className="flex items-center justify-center sm:justify-start gap-2">
+              <Image src="/schrodingerlabs.png" alt="Shroud Network" width={32} height={32} className="rounded-sm" />
+              <p className="text-xl font-bold text-[#acf901] uppercase tracking-wide">
+                Shroud Network
+              </p>
+            </div>
             <p className="mt-2 text-sm text-[#888888]">
-              Zero-knowledge shielded token transfers on Avalanche. Privacy by default.
+              Privacy redefined with zero-knowledge on permissionless ledgers.
             </p>
           </div>
 
@@ -96,8 +101,8 @@ function Footer() {
               <p className="font-semibold text-[#acf901]/70 uppercase tracking-wider text-xs mb-3">
                 Community
               </p>
-              <a href="https://twitter.com" className="block hover:text-[#acf901] transition-colors duration-200">Twitter</a>
-              <a href="https://discord.gg" className="block hover:text-[#acf901] transition-colors duration-200">Discord</a>
+              <a href="https://x.com/shroudnetwork" className="block hover:text-[#acf901] transition-colors duration-200">Twitter</a>
+              <a href="https://t.me/+CQMq831HnFo2ZDRl" className="block hover:text-[#acf901] transition-colors duration-200">Telegram</a>
             </div>
           </div>
         </div>

@@ -10,7 +10,7 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Shroud Network — Private Token Transfers",
+  title: "Shroud Network — Privacy redefined",
   description:
     "Zero-knowledge shielded token transfers on Avalanche. Shield your assets, transfer privately, and maintain full self-custody.",
 };
