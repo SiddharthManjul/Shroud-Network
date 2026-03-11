@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { WalletButton } from "./wallet-button";
 import { TokenSelector } from "./token-selector";
@@ -24,8 +25,9 @@ export function Nav() {
     <nav className="border-b border-[#2a2a2a] bg-black">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
         <div className="flex items-center gap-6">
-          <Link href="/dashboard" className="text-lg font-bold text-[#acf901] tracking-wide">
-            Shroud Network
+          <Link href="/dashboard" className="flex items-center gap-2 text-lg font-bold text-[#acf901] tracking-wide">
+            <Image src="/schrodingerlabs.png" alt="Shroud Network" width={28} height={28} className="rounded-sm" />
+            <span className="hidden sm:inline">Shroud Network</span>
           </Link>
           <div className="hidden md:flex gap-1">
             {links.map(({ href, label }) => (
