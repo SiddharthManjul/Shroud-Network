@@ -23,6 +23,17 @@ const Background3D = dynamic(
 /* ────────────────────────────────────────────────────────── */
 function LandingNav() {
   const { connect, connecting } = useWallet();
+  const [error, setError] = useState<string | null>(null);
+
+  const handleConnect = async () => {
+    setError(null);
+    try {
+      await connect();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Connection failed");
+      setTimeout(() => setError(null), 5000);
+    }
+  };
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-[#1a1a1a] bg-black/80 backdrop-blur-md">
@@ -34,7 +45,7 @@ function LandingNav() {
         <FuturisticButton
           variant="outline"
           size="sm"
-          onClick={connect}
+          onClick={handleConnect}
           disabled={connecting}
           borderColor="rgba(172,249,1,0.8)"
           borderWidth={1.5}
@@ -43,6 +54,11 @@ function LandingNav() {
           {connecting ? "Connecting…" : "Connect Wallet"}
         </FuturisticButton>
       </div>
+      {error && (
+        <div className="bg-red-900/80 text-white text-xs text-center py-1.5 px-4">
+          {error}
+        </div>
+      )}
     </header>
   );
 }
@@ -136,7 +152,7 @@ export default function LandingPage() {
     <div className="min-h-screen bg-black relative">
       <Background3D key={mountKey} />
       <LandingNav />
-      <div className="fixed top-[57px] left-0 right-0 z-40">
+      <div className="fixed top-14.25 left-0 right-0 z-40">
         <NewsTicker />
       </div>
 
