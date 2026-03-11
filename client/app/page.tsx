@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useWallet } from "@/hooks/use-wallet";
 import { FuturisticButton } from "@/components/ui/button";
 import Image from "next/image";
+import { NewsTicker } from "@/components/news-ticker";
 import { HeroSection } from "@/components/landing/HeroSection";
 import { BentoGrid } from "@/components/landing/BentoGrid";
 import { ScrollSections } from "@/components/landing/ScrollSections";
@@ -135,9 +136,12 @@ export default function LandingPage() {
     <div className="min-h-screen bg-black relative">
       <Background3D key={mountKey} />
       <LandingNav />
+      <div className="fixed top-[57px] left-0 right-0 z-40">
+        <NewsTicker />
+      </div>
 
       {/* Hero — full viewport */}
-      <div className="pt-16">
+      <div className="pt-24">
         <HeroSection />
       </div>
 
