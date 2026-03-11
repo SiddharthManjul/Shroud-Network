@@ -10,13 +10,11 @@
 
 const headlines: string[] = [
   "Shroud Network testnet is live on Avalanche Fuji",
-  "Shielded transfers powered by Groth16 ZK proofs",
-  "Gas-free relayed transactions via Paymaster",
-  "Create a shielded pool for any ERC20 token",
-  "Privacy is a right, not a feature",
+  "Docs coming soon - join our Telegram for updates",
+  "Shroud Network is now live on X. Follow us @ShroudNetwork for the latest news and updates!",
 ];
 
-const SEPARATOR = " \u2022 "; // bullet between items
+const SEPARATOR = "  \u00A0\u00A0\u2022\u00A0\u00A0  "; // bullet with wide spacing
 
 export function NewsTicker() {
   if (headlines.length === 0) return null;
@@ -26,10 +24,10 @@ export function NewsTicker() {
   return (
     <div className="w-full overflow-hidden bg-[#acf901] select-none">
       <div className="flex whitespace-nowrap animate-ticker">
-        <span className="inline-block px-4 py-3 text-lg font-medium text-black">
+        <span className="inline-block px-4 pt-4.5 pb-3.5 text-lg font-medium text-black leading-none">
           {text}
         </span>
-        <span className="inline-block px-4 py-3 text-lg font-medium text-black">
+        <span className="inline-block px-4 pt-4.5 pb-3.5 text-lg font-medium text-black leading-none">
           {text}
         </span>
       </div>

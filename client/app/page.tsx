@@ -110,7 +110,7 @@ function Footer() {
               <p className="font-semibold text-[#acf901]/70 uppercase tracking-wider text-xs mb-3">
                 Protocol
               </p>
-              <a href="https://github.com" className="block hover:text-[#acf901] transition-colors duration-200">GitHub</a>
+              {/* <a href="https://github.com" className="block hover:text-[#acf901] transition-colors duration-200">GitHub</a> */}
               <a href="#" className="block hover:text-[#acf901] transition-colors duration-200">Docs</a>
               <a href="https://testnet.snowtrace.io" className="block hover:text-[#acf901] transition-colors duration-200">Explorer</a>
             </div>
