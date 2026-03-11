@@ -123,7 +123,16 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const connect = useCallback(async () => {
     if (!window.ethereum) {
-      throw new Error("No injected wallet found");
+      // No injected wallet — on mobile, deep-link to MetaMask's in-app browser
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      if (isMobile) {
+        const dappUrl = window.location.href.replace(/^https?:\/\//, "");
+        window.location.href = `https://metamask.app.link/dapp/${dappUrl}`;
+        return;
+      }
+      throw new Error(
+        "No wallet found. Install MetaMask or open this page in a wallet browser."
+      );
     }
 
     // Prevent concurrent eth_requestAccounts calls
