@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Contract, Interface, JsonRpcProvider, Wallet, formatEther } from "ethers";
 import { PAYMASTER_ABI } from "@/lib/zktoken/abi/paymaster";
+import { META_TX_RELAYER_ABI } from "@/lib/zktoken/abi/meta-tx-relayer";
 import { SHIELDED_POOL_ABI } from "@/lib/zktoken/abi/shielded-pool";
 import { TRANSFER_VERIFIER_ABI } from "@/lib/zktoken/abi/transfer-verifier";
 import { WITHDRAW_VERIFIER_ABI } from "@/lib/zktoken/abi/withdraw-verifier";
@@ -10,6 +11,7 @@ export const runtime = "nodejs";
 const RELAY_PRIVATE_KEY = process.env.RELAY_PRIVATE_KEY;
 const RELAY_RPC_URL = process.env.RELAY_RPC_URL ?? process.env.NEXT_PUBLIC_RPC_URL;
 const PAYMASTER_ADDRESS = process.env.NEXT_PUBLIC_PAYMASTER_ADDRESS;
+const META_TX_RELAYER_ADDRESS = process.env.NEXT_PUBLIC_META_TX_RELAYER_ADDRESS;
 
 // ─── Rate limiter (per-IP sliding window) ────────────────────────────────────
 
@@ -150,6 +152,136 @@ async function checkPaymasterBalance(
   }
 }
 
+// ─── MetaTxRelayer handler (deposit + meta-withdraw) ─────────────────────────
+
+async function handleMetaTxRelay(
+  body: MetaDepositBody | MetaWithdrawBody,
+  wallet: Wallet,
+  provider: JsonRpcProvider
+): Promise<NextResponse> {
+  const targetRelayer =
+    ("metaTxRelayerAddress" in body ? body.metaTxRelayerAddress : undefined) ||
+    META_TX_RELAYER_ADDRESS;
+
+  if (!targetRelayer) {
+    return NextResponse.json(
+      { error: "No MetaTxRelayer address configured. Set NEXT_PUBLIC_META_TX_RELAYER_ADDRESS." },
+      { status: 400 }
+    );
+  }
+
+  const relayerIface = new Interface(META_TX_RELAYER_ABI);
+
+  try {
+    let data: string;
+
+    if (body.type === "deposit") {
+      const d = body as MetaDepositBody;
+      if (!d.depositor || !d.pool || !d.amount || !d.commitment || !d.signature) {
+        return NextResponse.json({ error: "Missing required deposit fields" }, { status: 400 });
+      }
+
+      data = relayerIface.encodeFunctionData("relayDeposit", [
+        {
+          depositor: d.depositor,
+          pool: d.pool,
+          amount: BigInt(d.amount),
+          commitment: BigInt(d.commitment),
+          fee: BigInt(d.fee ?? "0"),
+          deadline: BigInt(d.deadline),
+          nonce: BigInt(d.nonce),
+          signature: d.signature,
+        },
+      ]);
+    } else {
+      const w = body as MetaWithdrawBody;
+      if (!w.withdrawer || !w.pool || !w.proof || !w.amount || !w.recipient || !w.signature) {
+        return NextResponse.json({ error: "Missing required meta-withdraw fields" }, { status: 400 });
+      }
+
+      // Pre-validate proof off-chain
+      const valid = await preValidateProof({
+        provider,
+        poolAddress: w.pool,
+        proofHex: w.proof,
+        pubSignals: [
+          BigInt(w.merkleRoot),
+          BigInt(w.nullifierHash),
+          BigInt(w.amount),
+          BigInt(w.changeCommitment ?? "0"),
+        ],
+        txType: "withdraw",
+      });
+      if (valid === false) {
+        return NextResponse.json(
+          { error: "Proof verification failed — invalid proof." },
+          { status: 400 }
+        );
+      }
+
+      data = relayerIface.encodeFunctionData("relayWithdraw", [
+        {
+          withdrawer: w.withdrawer,
+          pool: w.pool,
+          proof: w.proof,
+          merkleRoot: BigInt(w.merkleRoot),
+          nullifierHash: BigInt(w.nullifierHash),
+          amount: BigInt(w.amount),
+          changeCommitment: BigInt(w.changeCommitment ?? "0"),
+          recipient: w.recipient,
+          encryptedMemo: w.encryptedMemo ?? "0x",
+          fee: BigInt(w.fee ?? "0"),
+          deadline: BigInt(w.deadline),
+          nonce: BigInt(w.nonce),
+          signature: w.signature,
+        },
+      ]);
+    }
+
+    const tx = await wallet.sendTransaction({ to: targetRelayer, data });
+    const receipt = await tx.wait();
+
+    return NextResponse.json({
+      txHash: tx.hash,
+      blockNumber: receipt!.blockNumber,
+      status: receipt!.status,
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+
+    if (message.includes("insufficient funds")) {
+      return NextResponse.json(
+        { error: "Relay wallet has insufficient AVAX for gas" },
+        { status: 503 }
+      );
+    }
+    if (message.includes("expired deadline")) {
+      return NextResponse.json(
+        { error: "Signature deadline expired" },
+        { status: 400 }
+      );
+    }
+    if (message.includes("signer mismatch") || message.includes("invalid signature")) {
+      return NextResponse.json(
+        { error: "Invalid signature — signer mismatch" },
+        { status: 400 }
+      );
+    }
+    if (message.includes("invalid nonce")) {
+      return NextResponse.json(
+        { error: "Invalid nonce — signature may have been replayed" },
+        { status: 400 }
+      );
+    }
+
+    console.error("[relay] MetaTx relay failed:", message);
+    return NextResponse.json(
+      { error: `Transaction failed: ${message}` },
+      { status: 500 }
+    );
+  }
+}
+
 // ─── GET /api/relay — Discovery endpoint ─────────────────────────────────────
 
 export async function GET() {
@@ -166,6 +298,7 @@ export async function GET() {
   return NextResponse.json({
     relayerAddress: wallet.address,
     paymasterAddress: PAYMASTER_ADDRESS ?? null,
+    metaTxRelayerAddress: META_TX_RELAYER_ADDRESS ?? null,
   });
 }
 
@@ -195,7 +328,38 @@ interface WithdrawBody {
   paymasterAddress?: string;
 }
 
-type RelayBody = TransferBody | WithdrawBody;
+interface MetaDepositBody {
+  type: "deposit";
+  depositor: string;
+  pool: string;
+  amount: string;
+  commitment: string;
+  fee: string;
+  deadline: string;
+  nonce: string;
+  signature: string;
+  metaTxRelayerAddress?: string;
+}
+
+interface MetaWithdrawBody {
+  type: "meta-withdraw";
+  withdrawer: string;
+  pool: string;
+  proof: string;
+  merkleRoot: string;
+  nullifierHash: string;
+  amount: string;
+  changeCommitment: string;
+  recipient: string;
+  encryptedMemo: string;
+  fee: string;
+  deadline: string;
+  nonce: string;
+  signature: string;
+  metaTxRelayerAddress?: string;
+}
+
+type RelayBody = TransferBody | WithdrawBody | MetaDepositBody | MetaWithdrawBody;
 
 export async function POST(request: NextRequest) {
   // ── Rate limiting ──────────────────────────────────────────────────────────
@@ -221,15 +385,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  if (!body.type || !["transfer", "withdraw"].includes(body.type)) {
+  const validTypes = ["transfer", "withdraw", "deposit", "meta-withdraw"];
+  if (!body.type || !validTypes.includes(body.type)) {
     return NextResponse.json(
-      { error: "Missing or invalid 'type' field. Must be 'transfer' or 'withdraw'." },
+      { error: `Missing or invalid 'type' field. Must be one of: ${validTypes.join(", ")}.` },
       { status: 400 }
     );
   }
 
+  const provider = new JsonRpcProvider(RELAY_RPC_URL);
+  const wallet = new Wallet(RELAY_PRIVATE_KEY, provider);
+
+  // ── MetaTxRelayer path (deposit / meta-withdraw) ─────────────────────────
+  if (body.type === "deposit" || body.type === "meta-withdraw") {
+    return handleMetaTxRelay(body as MetaDepositBody | MetaWithdrawBody, wallet, provider);
+  }
+
+  // ── Paymaster path (transfer / withdraw) ─────────────────────────────────
   // Use paymasterAddress from body (multi-token), fall back to env var (legacy)
-  const targetPaymaster = body.paymasterAddress || PAYMASTER_ADDRESS;
+  const targetPaymaster = (body as TransferBody | WithdrawBody).paymasterAddress || PAYMASTER_ADDRESS;
   if (!targetPaymaster) {
     return NextResponse.json(
       { error: "No paymaster address provided and NEXT_PUBLIC_PAYMASTER_ADDRESS not set." },
@@ -237,8 +411,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const provider = new JsonRpcProvider(RELAY_RPC_URL);
-  const wallet = new Wallet(RELAY_PRIVATE_KEY, provider);
   const paymasterIface = new Interface(PAYMASTER_ABI);
 
   // ── Paymaster balance check ────────────────────────────────────────────────
