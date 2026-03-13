@@ -11,7 +11,8 @@
 const headlines: string[] = [
   "Shroud Network testnet is live on Avalanche Fuji",
   "Docs coming soon - join our Telegram for updates",
-  "Shroud Network is now live on X. Follow us @ShroudNetwork for the latest news and updates!",
+  "Shroud Network is now live on X. Follow us @ShroudNetwork for the latest news and updates",
+  "Shroud is now enabled with multi-token gas payment support"
 ];
 
 const SEPARATOR = "  \u00A0\u00A0\u2022\u00A0\u00A0  "; // bullet with wide spacing
