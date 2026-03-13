@@ -181,6 +181,20 @@ async function handleMetaTxRelay(
         return NextResponse.json({ error: "Missing required deposit fields" }, { status: 400 });
       }
 
+      // Pre-flight nonce check — read on-chain nonce and compare
+      const relayerContract = new Contract(targetRelayer, META_TX_RELAYER_ABI, provider);
+      const onChainNonce: bigint = await relayerContract.nonces(d.depositor);
+      const requestedNonce = BigInt(d.nonce);
+      if (requestedNonce !== onChainNonce) {
+        return NextResponse.json(
+          {
+            error: `Nonce mismatch: you sent nonce ${requestedNonce} but on-chain nonce is ${onChainNonce}. ` +
+              `A previous deposit may have already succeeded. Please refresh and check your notes.`,
+          },
+          { status: 400 }
+        );
+      }
+
       data = relayerIface.encodeFunctionData("relayDeposit", [
         {
           depositor: d.depositor,
