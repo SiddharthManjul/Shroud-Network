@@ -24,10 +24,10 @@ export function NewsTicker() {
   return (
     <div className="w-full overflow-hidden bg-[#acf901] select-none">
       <div className="flex whitespace-nowrap animate-ticker">
-        <span className="inline-block px-4 pt-4.5 pb-3.5 text-lg font-medium text-black leading-none">
+        <span className="inline-block px-4 pt-3.5 pb-3.5 text-lg font-medium text-black leading-none">
           {text}
         </span>
-        <span className="inline-block px-4 pt-4.5 pb-3.5 text-lg font-medium text-black leading-none">
+        <span className="inline-block px-4 pt-3.5 pb-3.5 text-lg font-medium text-black leading-none">
           {text}
         </span>
       </div>
