@@ -285,6 +285,58 @@ export interface RelayWithdrawParams {
   paymasterAddress?: string;
 }
 
+/** Parameters for a relayed deposit via MetaTxRelayer (gasless, EIP-712 signed). */
+export interface RelayDepositParams {
+  /** EthersJS signer for EIP-712 signing. */
+  signer: EthersSigner;
+  /** EthersJS provider for reading nonce + chain data. */
+  provider: EthersProvider;
+  /** ShieldedPool contract address. */
+  poolAddress: string;
+  /** ERC20 token address. */
+  tokenAddress: string;
+  /** Amount to deposit in whole token units. */
+  amount: bigint;
+  /** Owner's Baby Jubjub public key for the new note. */
+  ownerPublicKey: BabyJubPoint;
+  /** Relay fee in whole token units (deducted from user's balance). */
+  fee: bigint;
+  /** MetaTxRelayer contract address. */
+  metaTxRelayerAddress: string;
+  /** Relay API URL (defaults to "/api/relay"). */
+  relayUrl?: string;
+}
+
+/** Parameters for a relayed withdrawal via MetaTxRelayer (fee in ERC20, no AVAX needed). */
+export interface RelayMetaWithdrawParams {
+  /** EthersJS signer for EIP-712 signing. */
+  signer: EthersSigner;
+  /** EthersJS provider for Merkle tree sync + chain data. */
+  provider: EthersProvider;
+  /** ShieldedPool contract address. */
+  poolAddress: string;
+  /** Note to spend. */
+  inputNote: Note;
+  /** Amount to withdraw. */
+  withdrawAmount: bigint;
+  /** EVM recipient address for the released tokens. */
+  recipient: string;
+  /** Sender's Baby Jubjub public key (for change note). */
+  senderPublicKey: BabyJubPoint;
+  /** Sender's Baby Jubjub private key. */
+  senderPrivateKey: bigint;
+  /** Path to withdraw.wasm. */
+  wasmPath: string;
+  /** Path to withdraw_final.zkey. */
+  zkeyPath: string;
+  /** Relay fee in whole token units (deducted from withdrawal). */
+  fee: bigint;
+  /** MetaTxRelayer contract address. */
+  metaTxRelayerAddress: string;
+  /** Relay API URL (defaults to "/api/relay"). */
+  relayUrl?: string;
+}
+
 /** Response from the relay API. */
 export interface RelayResponse {
   /** Transaction hash of the relayed transaction. */
