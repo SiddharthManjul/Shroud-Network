@@ -243,26 +243,75 @@ export async function relayDeposit(
   } = params;
 
   if (amount <= 0n) throw new Error("relayDeposit: amount must be > 0");
+  if (!signer.provider) throw new Error("relayDeposit: signer has no provider");
 
   const pendingNote = await createNote(amount, ownerPublicKey, tokenAddress);
 
   const signerAddress = await signer.getAddress();
 
-  // Get nonce from MetaTxRelayer
+  // Check + set token approval for MetaTxRelayer (one-time, costs gas)
+  const erc20Iface = new Interface(TEST_TOKEN_ABI);
+
+  // Read amountScale from the pool to know the actual scaled total
   const { Contract } = await import("ethers");
-  const { META_TX_RELAYER_ABI } = await import("./abi/meta-tx-relayer");
+  const { SHIELDED_POOL_ABI } = await import("./abi/shielded-pool");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const relayerContract = new Contract(metaTxRelayerAddress, META_TX_RELAYER_ABI, provider as any);
-  const nonce: bigint = await relayerContract.nonces(signerAddress);
+  const poolContract = new Contract(poolAddress, SHIELDED_POOL_ABI, provider as any);
+  const amountScale: bigint = await poolContract.amountScale();
+  const scaledTotal = (amount + fee) * amountScale;
 
-  // Deadline: 1 hour from now
-  const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
+  // Read current allowance
+  const allowanceData = erc20Iface.encodeFunctionData("allowance", [
+    signerAddress,
+    metaTxRelayerAddress,
+  ]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allowanceResult = await (provider as any).call({
+    to: tokenAddress,
+    data: allowanceData,
+  });
+  const currentAllowance = BigInt(allowanceResult);
 
-  // Get chain ID
+  if (currentAllowance < scaledTotal) {
+    // Check if user has AVAX to pay gas for the one-time approval
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const avaxBalance = await (provider as any).getBalance(signerAddress);
+    if (BigInt(avaxBalance) === 0n) {
+      throw new Error(
+        "You need a small amount of AVAX for a one-time token approval. " +
+        "After approval, all future deposits will be gasless. " +
+        "Send ~0.01 AVAX to your wallet and try again."
+      );
+    }
+
+    // Approve max uint256 (one-time gas cost)
+    const approveData = erc20Iface.encodeFunctionData("approve", [
+      metaTxRelayerAddress,
+      BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+    ]);
+    try {
+      const approveTx = await sendWithGas(signer, {
+        to: tokenAddress,
+        data: approveData,
+      });
+      await approveTx.wait();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `Token approval failed: ${msg}. ` +
+        "Ensure you have AVAX for gas and that your wallet is connected to Avalanche Fuji."
+      );
+    }
+  }
+
+  // Get chain ID (stable, fetch once)
   const network = await provider.getNetwork();
   const chainId = network.chainId;
 
-  // Build EIP-712 typed data
+  const { META_TX_RELAYER_ABI } = await import("./abi/meta-tx-relayer");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const relayerContract = new Contract(metaTxRelayerAddress, META_TX_RELAYER_ABI, provider as any);
+
   const domain = {
     name: "ShroudMetaTxRelayer",
     version: "1",
@@ -282,46 +331,67 @@ export async function relayDeposit(
     ],
   };
 
-  const value = {
-    depositor: signerAddress,
-    pool: poolAddress,
-    amount: amount,
-    commitment: pendingNote.noteCommitment,
-    fee: fee,
-    deadline: deadline,
-    nonce: nonce,
+  // Sign-and-submit helper (supports one retry on stale nonce)
+  const signAndSubmit = async (): Promise<RelayResponse> => {
+    // Read nonce fresh each attempt (bypass any provider cache)
+    const nonce: bigint = await relayerContract.nonces(signerAddress);
+
+    const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
+
+    const value = {
+      depositor: signerAddress,
+      pool: poolAddress,
+      amount: amount,
+      commitment: pendingNote.noteCommitment,
+      fee: fee,
+      deadline: deadline,
+      nonce: nonce,
+    };
+
+    // Request EIP-712 signature from wallet
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const signature = await (signer as any).signTypedData(domain, types, value);
+
+    const body = {
+      type: "deposit" as const,
+      depositor: signerAddress,
+      pool: poolAddress,
+      amount: amount.toString(),
+      commitment: pendingNote.noteCommitment.toString(),
+      fee: fee.toString(),
+      deadline: deadline.toString(),
+      nonce: nonce.toString(),
+      signature,
+      metaTxRelayerAddress,
+    };
+
+    const res = await fetch(relayUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`relayDeposit: relay returned ${res.status}: ${errText}`);
+    }
+
+    return res.json();
   };
 
-  // Request EIP-712 signature from wallet
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const signature = await (signer as any).signTypedData(domain, types, value);
-
-  // POST to relay API
-  const body = {
-    type: "deposit" as const,
-    depositor: signerAddress,
-    pool: poolAddress,
-    amount: amount.toString(),
-    commitment: pendingNote.noteCommitment.toString(),
-    fee: fee.toString(),
-    deadline: deadline.toString(),
-    nonce: nonce.toString(),
-    signature,
-    metaTxRelayerAddress,
-  };
-
-  const res = await fetch(relayUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`relayDeposit: relay returned ${res.status}: ${errText}`);
+  // First attempt — if nonce is stale, retry once with fresh nonce
+  let relay: RelayResponse;
+  try {
+    relay = await signAndSubmit();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("nonce") || msg.includes("replayed")) {
+      // Nonce was stale (previous tx may have landed). Retry with fresh nonce.
+      relay = await signAndSubmit();
+    } else {
+      throw err;
+    }
   }
-
-  const relay: RelayResponse = await res.json();
 
   return { relay, pendingNote };
 }
