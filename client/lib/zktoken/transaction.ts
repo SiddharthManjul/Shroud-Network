@@ -21,6 +21,8 @@ import {
   type WithdrawParams,
   type RelayTransferParams,
   type RelayWithdrawParams,
+  type RelayDepositParams,
+  type RelayMetaWithdrawParams,
   type RelayResponse,
   type EthersTransactionResponse,
   type EthersTransactionRequest,
@@ -207,6 +209,354 @@ export async function waitForDeposit(
   return finaliseNote({ ...pendingNote, createdAtBlock: receipt.blockNumber }, leafIndex);
 }
 
+
+// ─── Relayed Deposit (MetaTxRelayer — gasless via EIP-712) ────────────────────
+
+/**
+ * Deposit ERC20 tokens into the shielded pool via the MetaTxRelayer.
+ *
+ * The user signs an EIP-712 message authorizing the deposit + fee. The relay
+ * wallet submits the transaction and receives the fee in ERC20 tokens.
+ * The user needs zero AVAX (except for the one-time token approval).
+ *
+ * Steps:
+ *   1. Create a new note
+ *   2. Check token allowance for MetaTxRelayer, prompt approval if needed
+ *   3. Get nonce from MetaTxRelayer contract
+ *   4. Build EIP-712 typed data and request wallet signature
+ *   5. POST to relay API with type "deposit"
+ *   6. Wait for confirmation and finalize note
+ */
+export async function relayDeposit(
+  params: RelayDepositParams
+): Promise<{ relay: RelayResponse; pendingNote: Note }> {
+  const {
+    signer,
+    provider,
+    poolAddress,
+    tokenAddress,
+    amount,
+    ownerPublicKey,
+    fee,
+    metaTxRelayerAddress,
+    relayUrl = "/api/relay",
+  } = params;
+
+  if (amount <= 0n) throw new Error("relayDeposit: amount must be > 0");
+
+  const pendingNote = await createNote(amount, ownerPublicKey, tokenAddress);
+
+  const signerAddress = await signer.getAddress();
+
+  // Get nonce from MetaTxRelayer
+  const { Contract } = await import("ethers");
+  const { META_TX_RELAYER_ABI } = await import("./abi/meta-tx-relayer");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const relayerContract = new Contract(metaTxRelayerAddress, META_TX_RELAYER_ABI, provider as any);
+  const nonce: bigint = await relayerContract.nonces(signerAddress);
+
+  // Deadline: 1 hour from now
+  const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
+
+  // Get chain ID
+  const network = await provider.getNetwork();
+  const chainId = network.chainId;
+
+  // Build EIP-712 typed data
+  const domain = {
+    name: "ShroudMetaTxRelayer",
+    version: "1",
+    chainId: Number(chainId),
+    verifyingContract: metaTxRelayerAddress,
+  };
+
+  const types = {
+    RelayDeposit: [
+      { name: "depositor", type: "address" },
+      { name: "pool", type: "address" },
+      { name: "amount", type: "uint256" },
+      { name: "commitment", type: "uint256" },
+      { name: "fee", type: "uint256" },
+      { name: "deadline", type: "uint256" },
+      { name: "nonce", type: "uint256" },
+    ],
+  };
+
+  const value = {
+    depositor: signerAddress,
+    pool: poolAddress,
+    amount: amount,
+    commitment: pendingNote.noteCommitment,
+    fee: fee,
+    deadline: deadline,
+    nonce: nonce,
+  };
+
+  // Request EIP-712 signature from wallet
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const signature = await (signer as any).signTypedData(domain, types, value);
+
+  // POST to relay API
+  const body = {
+    type: "deposit" as const,
+    depositor: signerAddress,
+    pool: poolAddress,
+    amount: amount.toString(),
+    commitment: pendingNote.noteCommitment.toString(),
+    fee: fee.toString(),
+    deadline: deadline.toString(),
+    nonce: nonce.toString(),
+    signature,
+    metaTxRelayerAddress,
+  };
+
+  const res = await fetch(relayUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`relayDeposit: relay returned ${res.status}: ${errText}`);
+  }
+
+  const relay: RelayResponse = await res.json();
+
+  return { relay, pendingNote };
+}
+
+/**
+ * Finalize a relayed deposit by finding the leaf index from chain events.
+ */
+export async function waitForRelayDeposit(
+  relay: RelayResponse,
+  pendingNote: Note,
+  provider: { getLogs: (f: { address?: string; topics?: (string | null | string[])[]; fromBlock?: number | string; toBlock?: number | string }) => Promise<{ topics: string[]; data: string; blockNumber: number; transactionHash: string }[]> },
+  poolAddress: string
+): Promise<Note> {
+  const poolIface = new Interface(SHIELDED_POOL_ABI);
+  const depositTopic = poolIface.getEvent("Deposit")!.topicHash;
+
+  const noteCommitmentHex =
+    "0x" + pendingNote.noteCommitment.toString(16).padStart(64, "0");
+
+  const logs = await provider.getLogs({
+    address: poolAddress,
+    topics: [depositTopic, noteCommitmentHex],
+    fromBlock: relay.blockNumber,
+    toBlock: relay.blockNumber,
+  });
+
+  if (logs.length === 0) {
+    throw new Error(
+      `waitForRelayDeposit: Deposit event not found for commitment. TX may be in a different block.`
+    );
+  }
+
+  const parsed = poolIface.parseLog(logs[0]);
+  if (!parsed) throw new Error("waitForRelayDeposit: failed to parse Deposit event");
+
+  const leafIndex = Number(parsed.args["leafIndex"] as bigint);
+  return finaliseNote({ ...pendingNote, createdAtBlock: relay.blockNumber }, leafIndex);
+}
+
+// ─── Relayed Withdraw (MetaTxRelayer — fee in ERC20, gasless) ────────────────
+
+/**
+ * Withdraw tokens from the shielded pool via the MetaTxRelayer.
+ *
+ * The user generates the ZK proof, signs an EIP-712 message authorizing the
+ * withdrawal + fee, and the relay submits it. The fee is deducted from the
+ * withdrawn amount in ERC20 tokens — zero AVAX needed.
+ */
+export async function relayMetaWithdraw(
+  params: RelayMetaWithdrawParams
+): Promise<{
+  relay: RelayResponse;
+  changeNote: Note | undefined;
+}> {
+  const {
+    signer,
+    provider,
+    poolAddress,
+    inputNote,
+    withdrawAmount,
+    recipient,
+    senderPublicKey,
+    senderPrivateKey,
+    wasmPath,
+    zkeyPath,
+    fee,
+    metaTxRelayerAddress,
+    relayUrl = "/api/relay",
+  } = params;
+
+  if (inputNote.spent) throw new Error("relayMetaWithdraw: inputNote is already spent");
+  if (inputNote.leafIndex < 0) throw new Error("relayMetaWithdraw: inputNote not yet finalised");
+  if (withdrawAmount <= 0n || withdrawAmount > inputNote.amount) {
+    throw new Error(`relayMetaWithdraw: invalid withdrawAmount ${withdrawAmount}`);
+  }
+  if (fee >= withdrawAmount) {
+    throw new Error(`relayMetaWithdraw: fee (${fee}) must be less than withdrawAmount (${withdrawAmount})`);
+  }
+
+  const { getAddress } = await import("ethers");
+  getAddress(recipient);
+
+  const signerAddress = await signer.getAddress();
+
+  // 1. Sync Merkle tree
+  const tree = new MerkleTreeSync();
+  await tree.syncFromChain(provider, poolAddress);
+
+  const treeLeaves = tree.getLeaves();
+  if (inputNote.leafIndex >= treeLeaves.length) {
+    throw new Error(
+      `relayMetaWithdraw: note leafIndex ${inputNote.leafIndex} is beyond tree size ${treeLeaves.length}.`
+    );
+  }
+  const onChainLeaf = treeLeaves[inputNote.leafIndex];
+  if (onChainLeaf !== inputNote.noteCommitment) {
+    throw new Error(
+      `relayMetaWithdraw: Merkle tree leaf mismatch at index ${inputNote.leafIndex}.`
+    );
+  }
+
+  const merklePath = await tree.getMerklePath(inputNote.leafIndex);
+
+  // 2. Generate proof
+  const proofResult = await generateWithdrawProof({
+    inputNote,
+    withdrawAmount,
+    recipient, // Note: proof doesn't bind recipient in public signals
+    senderPublicKey,
+    senderPrivateKey,
+    merklePath,
+    wasmPath,
+    zkeyPath,
+  });
+
+  const [merkleRoot, nullifierHash, amount, changeCommitment] = proofResult.publicSignals;
+
+  // 3. Encrypt change memo (if partial)
+  let encryptedMemoHex = "0x";
+  if (proofResult.changeNote) {
+    const changeMemoData = {
+      amount: proofResult.changeNote.amount,
+      blinding: proofResult.changeNote.blinding,
+      secret: proofResult.changeNote.secret,
+      nullifierPreimage: proofResult.changeNote.nullifierPreimage,
+    };
+    const encryptedMemo = await encryptMemo(changeMemoData, senderPublicKey);
+    encryptedMemoHex = "0x" + bytesToHex(encryptedMemo);
+  }
+
+  // 4. Get nonce from MetaTxRelayer
+  const { Contract } = await import("ethers");
+  const { META_TX_RELAYER_ABI } = await import("./abi/meta-tx-relayer");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const relayerContract = new Contract(metaTxRelayerAddress, META_TX_RELAYER_ABI, provider as any);
+  const nonce: bigint = await relayerContract.nonces(signerAddress);
+  const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
+  const network = await provider.getNetwork();
+  const chainId = network.chainId;
+
+  // 5. Build EIP-712 typed data and sign
+  const proofHex = "0x" + bytesToHex(proofResult.proofBytes);
+
+  // The contract hashes the proof, so we need to compute keccak256(proof) for the typed data
+  const { keccak256: ethersKeccak256 } = await import("ethers");
+  const proofHash = ethersKeccak256(proofHex);
+
+  const domain = {
+    name: "ShroudMetaTxRelayer",
+    version: "1",
+    chainId: Number(chainId),
+    verifyingContract: metaTxRelayerAddress,
+  };
+
+  const types = {
+    RelayWithdraw: [
+      { name: "withdrawer", type: "address" },
+      { name: "pool", type: "address" },
+      { name: "proofHash", type: "bytes32" },
+      { name: "merkleRoot", type: "uint256" },
+      { name: "nullifierHash", type: "uint256" },
+      { name: "amount", type: "uint256" },
+      { name: "changeCommitment", type: "uint256" },
+      { name: "recipient", type: "address" },
+      { name: "fee", type: "uint256" },
+      { name: "deadline", type: "uint256" },
+      { name: "nonce", type: "uint256" },
+    ],
+  };
+
+  const value = {
+    withdrawer: signerAddress,
+    pool: poolAddress,
+    proofHash: proofHash,
+    merkleRoot: merkleRoot,
+    nullifierHash: nullifierHash,
+    amount: amount,
+    changeCommitment: changeCommitment,
+    recipient: recipient,
+    fee: fee,
+    deadline: deadline,
+    nonce: nonce,
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const signature = await (signer as any).signTypedData(domain, types, value);
+
+  // 6. POST to relay API
+  const body = {
+    type: "meta-withdraw" as const,
+    withdrawer: signerAddress,
+    pool: poolAddress,
+    proof: proofHex,
+    merkleRoot: merkleRoot.toString(),
+    nullifierHash: nullifierHash.toString(),
+    amount: amount.toString(),
+    changeCommitment: changeCommitment.toString(),
+    recipient,
+    encryptedMemo: encryptedMemoHex,
+    fee: fee.toString(),
+    deadline: deadline.toString(),
+    nonce: nonce.toString(),
+    signature,
+    metaTxRelayerAddress,
+  };
+
+  const res = await fetch(relayUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`relayMetaWithdraw: relay returned ${res.status}: ${errText}`);
+  }
+
+  const relay: RelayResponse = await res.json();
+
+  // 7. Finalize change note
+  let finalizedChange = proofResult.changeNote;
+  if (finalizedChange) {
+    const postTree = new MerkleTreeSync();
+    await postTree.syncFromChain(provider, poolAddress);
+    const changeIdx = postTree.findLeafIndex(finalizedChange.noteCommitment);
+    if (changeIdx >= 0) {
+      finalizedChange = await finaliseNote(
+        { ...finalizedChange, createdAtBlock: relay.blockNumber },
+        changeIdx
+      );
+    }
+  }
+
+  return { relay, changeNote: finalizedChange };
+}
 
 // ─── Private Transfer ─────────────────────────────────────────────────────────
 
