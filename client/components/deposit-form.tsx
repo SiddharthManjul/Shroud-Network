@@ -108,7 +108,7 @@ export function DepositForm() {
         const { relayDeposit, waitForRelayDeposit } = await import("@/lib/zktoken/transaction");
         const fee = computeFee(BigInt(trimmed));
 
-        setStatus("Sign the EIP-712 message in your wallet to authorize the deposit...");
+        setStatus("Checking token approval for relayer (one-time approval may require a small AVAX gas fee)...");
         const result = await relayDeposit({
           signer: signer as never,
           provider: provider! as never,
