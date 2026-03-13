@@ -227,6 +227,19 @@ export const SHIELDED_POOL_ABI = [
   },
   {
     "inputs": [],
+    "name": "amountScale",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "token",
     "outputs": [
       {
