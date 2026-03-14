@@ -38,21 +38,33 @@ function LandingNav() {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-[#1a1a1a] bg-black/80 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-        <span className="flex items-center gap-2 text-xl font-bold text-[#acf901] tracking-wide uppercase">
-          <Image src="/schrodingerlabs.png" alt="Shroud Network" width={28} height={28} className="rounded-sm" />
-          Shroud Network
-        </span>
-        <FuturisticButton
-          variant="outline"
-          size="sm"
-          onClick={handleConnect}
-          disabled={connecting}
-          borderColor="rgba(172,249,1,0.8)"
-          borderWidth={1.5}
-          className="text-[#acf901] text-xs font-semibold tracking-wider uppercase"
-        >
-          {connecting ? "Connecting…" : "Connect Wallet"}
-        </FuturisticButton>
+        <div className="flex items-center gap-6">
+          <span className="flex items-center gap-2 text-xl font-bold text-[#acf901] tracking-wide uppercase">
+            <Image src="/schrodingerlabs.png" alt="Shroud Network" width={28} height={28} className="rounded-sm" />
+            Shroud Network
+          </span>
+          <a
+            href="https://docs.shroudnetwork.xyz"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-md px-3 py-1.5 text-sm font-medium text-[#888888] hover:text-[#acf901] hover:bg-[#acf901]/5 transition-colors duration-200"
+          >
+            Docs
+          </a>
+        </div>
+        <div className="flex items-center gap-4">
+          <FuturisticButton
+            variant="outline"
+            size="sm"
+            onClick={handleConnect}
+            disabled={connecting}
+            borderColor="rgba(172,249,1,0.8)"
+            borderWidth={1.5}
+            className="text-[#acf901] text-xs font-semibold tracking-wider uppercase"
+          >
+            {connecting ? "Connecting…" : "Connect Wallet"}
+          </FuturisticButton>
+        </div>
       </div>
       {error && (
         <div className="bg-red-900/80 text-white text-xs text-center py-1.5 px-4">
@@ -111,7 +123,7 @@ function Footer() {
                 Protocol
               </p>
               {/* <a href="https://github.com" className="block hover:text-[#acf901] transition-colors duration-200">GitHub</a> */}
-              <a href="#" className="block hover:text-[#acf901] transition-colors duration-200">Docs</a>
+              <a href="https://docs.shroudnetwork.xyz" target="_blank" rel="noopener noreferrer" className="block hover:text-[#acf901] transition-colors duration-200">Docs</a>
               <a href="https://testnet.snowtrace.io" className="block hover:text-[#acf901] transition-colors duration-200">Explorer</a>
             </div>
             <div className="space-y-2">

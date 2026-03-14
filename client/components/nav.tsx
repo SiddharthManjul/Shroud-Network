@@ -7,14 +7,14 @@ import { usePathname } from "next/navigation";
 import { WalletButton } from "./wallet-button";
 import { TokenSelector } from "./token-selector";
 
-const links = [
+const links: { href: string; label: string; external?: boolean }[] = [
   { href: "/deposit", label: "Deposit" },
   { href: "/transfer", label: "Transfer" },
   { href: "/withdraw", label: "Withdraw" },
   { href: "/notes", label: "Notes" },
   { href: "/pools", label: "Pools" },
   { href: "/faucet", label: "Faucet" },
-  { href: "/guide", label: "Guide" },
+  { href: "https://docs.shroudnetwork.xyz", label: "Docs", external: true },
 ];
 
 export function Nav() {
@@ -30,19 +30,31 @@ export function Nav() {
             <span className="hidden sm:inline">Shroud Network</span>
           </Link>
           <div className="hidden md:flex gap-1">
-            {links.map(({ href, label }) => (
-              <Link
-                key={href}
-                href={href}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors duration-200 ${
-                  pathname === href
-                    ? "bg-[#acf901]/10 text-[#acf901] border border-[#acf901]/40"
-                    : "text-[#888888] hover:text-[#acf901] hover:bg-[#acf901]/5"
-                }`}
-              >
-                {label}
-              </Link>
-            ))}
+            {links.map(({ href, label, external }) =>
+              external ? (
+                <a
+                  key={href}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-md px-3 py-1.5 text-sm font-medium transition-colors duration-200 text-[#888888] hover:text-[#acf901] hover:bg-[#acf901]/5"
+                >
+                  {label}
+                </a>
+              ) : (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors duration-200 ${
+                    pathname === href
+                      ? "bg-[#acf901]/10 text-[#acf901] border border-[#acf901]/40"
+                      : "text-[#888888] hover:text-[#acf901] hover:bg-[#acf901]/5"
+                  }`}
+                >
+                  {label}
+                </Link>
+              )
+            )}
           </div>
         </div>
         <div className="hidden md:flex items-center gap-4">
@@ -80,20 +92,33 @@ export function Nav() {
             <TokenSelector />
             <WalletButton />
           </div>
-          {links.map(({ href, label }) => (
-            <Link
-              key={href}
-              href={href}
-              onClick={() => setMobileOpen(false)}
-              className={`block rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200 ${
-                pathname === href
-                  ? "bg-[#acf901]/10 text-[#acf901] border border-[#acf901]/40"
-                  : "text-[#888888] hover:text-[#acf901] hover:bg-[#acf901]/5"
-              }`}
-            >
-              {label}
-            </Link>
-          ))}
+          {links.map(({ href, label, external }) =>
+            external ? (
+              <a
+                key={href}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMobileOpen(false)}
+                className="block rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200 text-[#888888] hover:text-[#acf901] hover:bg-[#acf901]/5"
+              >
+                {label}
+              </a>
+            ) : (
+              <Link
+                key={href}
+                href={href}
+                onClick={() => setMobileOpen(false)}
+                className={`block rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200 ${
+                  pathname === href
+                    ? "bg-[#acf901]/10 text-[#acf901] border border-[#acf901]/40"
+                    : "text-[#888888] hover:text-[#acf901] hover:bg-[#acf901]/5"
+                }`}
+              >
+                {label}
+              </Link>
+            )
+          )}
         </div>
       )}
     </nav>
