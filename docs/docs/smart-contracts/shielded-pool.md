@@ -37,18 +37,6 @@ Deposit amount is visible on-chain (the ERC20 `transferFrom` is public). Privacy
 
 ### transfer
 
-```solidity
-function transfer(
-    bytes calldata proof,
-    uint256 merkleRoot,
-    uint256 nullifierHash,
-    uint256 newCommitment1,
-    uint256 newCommitment2,
-    bytes calldata encryptedMemo1,
-    bytes calldata encryptedMemo2
-) external
-```
-
 Executes a private transfer inside the pool. Consumes one note (via nullifier) and creates two new notes.
 
 The contract:
@@ -61,18 +49,6 @@ The contract:
 
 ### withdraw
 
-```solidity
-function withdraw(
-    bytes calldata proof,
-    uint256 merkleRoot,
-    uint256 nullifierHash,
-    uint256 amount,
-    uint256 changeCommitment,
-    address recipient,
-    bytes calldata encryptedMemo
-) external
-```
-
 Exits the shielded pool. Consumes a note and releases ERC20 tokens to the recipient.
 
 | Parameter | Description |
@@ -81,17 +57,6 @@ Exits the shielded pool. Consumes a note and releases ERC20 tokens to the recipi
 | `amount` | Withdrawal amount (public, needed to release ERC20) |
 | `changeCommitment` | Change note commitment (0 if full withdrawal) |
 | `recipient` | Address to receive the ERC20 tokens |
-
-### View functions
-
-```solidity
-function getRoot() external view returns (uint256)
-function getNextLeafIndex() external view returns (uint32)
-function isSpent(uint256 nullifierHash) external view returns (bool)
-function isKnownRoot(uint256 root) external view returns (bool)
-function amountScale() external view returns (uint256)
-function token() external view returns (address)
-```
 
 ## Merkle tree
 

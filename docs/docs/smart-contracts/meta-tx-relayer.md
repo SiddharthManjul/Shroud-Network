@@ -23,21 +23,6 @@ Token fee deducted    ◄──────────  Receive token fee as co
 
 ### relayDeposit
 
-```solidity
-struct DepositRequest {
-    address depositor;
-    address pool;
-    uint256 amount;
-    uint256 commitment;
-    uint256 fee;
-    uint256 deadline;
-    uint256 nonce;
-    bytes signature;
-}
-
-function relayDeposit(DepositRequest calldata req) external
-```
-
 The contract:
 1. Verifies the EIP-712 signature matches the depositor
 2. Checks nonce and deadline
@@ -47,26 +32,6 @@ The contract:
 6. Increments the depositor's nonce
 
 ### relayWithdraw
-
-```solidity
-struct WithdrawRequest {
-    address withdrawer;
-    address pool;
-    bytes proof;
-    uint256 merkleRoot;
-    uint256 nullifierHash;
-    uint256 amount;
-    uint256 changeCommitment;
-    address recipient;
-    bytes encryptedMemo;
-    uint256 fee;
-    uint256 deadline;
-    uint256 nonce;
-    bytes signature;
-}
-
-function relayWithdraw(WithdrawRequest calldata req) external
-```
 
 The contract:
 1. Verifies the EIP-712 signature
