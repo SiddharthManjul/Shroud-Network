@@ -32,18 +32,18 @@ The app will automatically prompt you to add/switch to Fuji testnet if needed.
 
 ## Getting test AVAX
 
-You need a small amount of test AVAX for gas fees (unless using gasless mode). Get free test AVAX from the [Avalanche Faucet](https://faucet.avax.network/).
+You need a small amount of test AVAX for gas fees (unless using gasless mode). Get free test AVAX from the [Avalanche Faucet](https://build.avax.network/console/primary-network/faucet).
 
-## Baby Jubjub keypair
+## Shroud keypair
 
-When you first connect, Shroud Network generates a **Baby Jubjub keypair** for you. This is a separate cryptographic keypair used for:
+When you first connect, Shroud Network generates a **Shroud keypair** for you. This is a separate cryptographic keypair used for:
 
 - Encrypting/decrypting shielded note data
 - Proving ownership of notes in ZK circuits
 - ECDH shared secrets for encrypted memos
 
-Your Baby Jubjub private key is derived deterministically from your EVM wallet signature, so it's always recoverable from the same wallet.
+Your Shroud private key is derived deterministically from your EVM wallet signature, so it's always recoverable from the same wallet.
 
 :::warning
-Your shielded notes are stored locally in your browser. If you clear your browser data, you'll need to rescan the chain to recover your notes.
+Your shielded notes are stored locally in your browser. If you clear your browser data or use a newer device, you'll need to rescan the chain to recover your notes.
 :::

@@ -186,13 +186,3 @@ Notes are stored in your browser's localStorage. Clearing browser data will dele
 - The relay handles gas — you don't need AVAX in the withdrawing address.
 :::
 
----
-
-## Important Reminders
-
-:::danger
-- Your notes are stored locally in your browser. If you clear browser data, your notes are gone. There is no recovery from the server.
-- Your shielded key is derived from a wallet signature — same wallet = same key. But notes themselves are not recoverable without local storage or a full chain rescan.
-- Privacy is proportional to the anonymity set. The more users in the pool, the stronger the privacy for everyone.
-- This is testnet software. Do not use with real funds on mainnet until the system has been fully audited.
-:::

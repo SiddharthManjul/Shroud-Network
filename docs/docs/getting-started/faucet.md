@@ -21,14 +21,14 @@ The faucet mints test ERC20 tokens that can be deposited into the shielded pool.
 | Property | Value |
 |---|---|
 | Token Name | Shroud Token |
-| Symbol | SHROUD |
+| Symbol | SRD |
 | Decimals | 18 |
 | Network | Avalanche Fuji Testnet |
 | Contract | See [Deployments](/smart-contracts/deployments) |
 
 ## Test AVAX
 
-For gas fees, get free test AVAX from the official [Avalanche Faucet](https://faucet.avax.network/).
+For gas fees, get free test AVAX from the official [Avalanche Faucet](https://build.avax.network/console/primary-network/faucet).
 
 :::tip
 If you plan to use **gasless mode** for deposits and withdrawals, you only need enough AVAX for a single token approval transaction (~0.01 AVAX). After that, all operations are gasless.

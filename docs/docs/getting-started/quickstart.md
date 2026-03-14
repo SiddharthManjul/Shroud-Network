@@ -9,7 +9,7 @@ Get up and running with Shroud Network in under 5 minutes.
 
 ## Prerequisites
 
-- A browser wallet (MetaMask, Core, Rabby, etc.)
+- A browser wallet (Core, MetaMask, Rabby, etc.)
 - Avalanche Fuji testnet configured in your wallet
 - Test AVAX for gas (or use gasless mode)
 
@@ -19,7 +19,7 @@ Visit [shroudnetwork.xyz](https://shroudnetwork.xyz) and click **Connect Wallet*
 
 ## Step 2: Get test tokens
 
-Navigate to the **Faucet** tab. You can mint test tokens (SHROUD) for free — click the faucet button to receive tokens to your wallet.
+Navigate to the **Faucet** tab. You can mint test tokens (SRD) for free — add it to your wallet & click the faucet button to receive tokens to your wallet.
 
 ## Step 3: Deposit into the shielded pool
 
