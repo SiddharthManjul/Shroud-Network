@@ -21,7 +21,7 @@ Shroud Network consists of three layers that work together to provide privacy.
 │  ShieldedPool, Merkle tree, nullifier registry, verifier │
 └──────────────────────────────────────────────────────────┘
                         │
-                  Avalanche C-Chain
+            Avalanche C-Chain (Fuji Testnet)
 ```
 
 ### 1. Smart Contracts

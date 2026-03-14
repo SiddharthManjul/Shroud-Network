@@ -63,14 +63,6 @@ Similar structure but with key differences:
 
 **Total: ~20,858 non-linear constraints.**
 
-## Circuit dependencies (circomlib)
-
-- `poseidon.circom` — Poseidon hash
-- `babyjub.circom` — Baby Jubjub point operations
-- `escalarmulfix.circom` — Fixed-base scalar multiplication
-- `bitify.circom` — Num2Bits for range proofs
-- `mux1.circom` — Multiplexer for Merkle path selection
-
 ## Compilation
 
 ```bash
