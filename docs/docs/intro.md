@@ -6,9 +6,9 @@ title: Introduction
 
 # Shroud Network
 
-**Privacy redefined with zero-knowledge proofs on Avalanche.**
+**Privacy redefined with zero-knowledge proofs for Permissionless Networks.**
 
-Shroud Network is a shielded pool privacy layer on Avalanche C-Chain. Users mint shielded tokens (zkTokens) against any ERC20 token at a 1:1 ratio. Inside the pool, all transfers are completely private — amounts, senders, and receivers are hidden. Only cryptographic commitments, nullifiers, and ZK proofs are visible on-chain.
+Shroud Network is a shielded pool privacy layer for permissionless networks, currently deployed on Avalanche Fuji Testnet. Users mint shielded tokens (Shroud Tokens) against any ERC20 token at a 1:1 ratio. Inside the pool, all transfers are completely private — amounts, senders, and receivers are hidden. Only cryptographic commitments, nullifiers, and ZK proofs are visible on-chain.
 
 ## What Shroud Network is NOT
 
@@ -39,7 +39,7 @@ ERC20 balance ◄─── withdraw ───── Commitment consumed
 | **Self-custody** | Only the note owner can spend their shielded tokens |
 | **Verifiable solvency** | Pool total is always public: `sum(deposits) - sum(withdrawals) = contract balance` |
 | **Gasless transactions** | Optional relay support — deposit and withdraw without holding AVAX |
-| **ERC20 compatible** | Works with any ERC20 token on Avalanche C-Chain |
+| **ERC20 compatible** | Works with any ERC20 token |
 
 ## Cryptographic stack
 
