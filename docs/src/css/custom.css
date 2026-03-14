@@ -1,0 +1,348 @@
+/* ─── Shroud Network Docs — Dark-only theme matching main app ──────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+
+/* ─── Core variables ──────────────────────────────────────────────────────── */
+
+:root {
+  --ifm-color-primary: #acf901;
+  --ifm-color-primary-dark: #9ae001;
+  --ifm-color-primary-darker: #91d301;
+  --ifm-color-primary-darkest: #78ae01;
+  --ifm-color-primary-light: #b4fa1a;
+  --ifm-color-primary-lighter: #bafc29;
+  --ifm-color-primary-lightest: #c9fd54;
+
+  --ifm-background-color: #000000;
+  --ifm-background-surface-color: #0d0d0d;
+  --ifm-font-family-base: 'Space Grotesk', sans-serif;
+  --ifm-heading-font-family: 'Space Grotesk', sans-serif;
+  --ifm-font-size-base: 15px;
+  --ifm-code-font-size: 90%;
+  --ifm-heading-font-weight: 700;
+
+  --ifm-navbar-background-color: #000000;
+  --ifm-navbar-shadow: none;
+  --ifm-footer-background-color: #000000;
+  --ifm-footer-color: #888888;
+  --ifm-footer-link-color: #888888;
+  --ifm-footer-title-color: #acf901;
+
+  --ifm-color-content: #e0e0e0;
+  --ifm-color-content-secondary: #888888;
+  --ifm-heading-color: #ffffff;
+  --ifm-link-color: #acf901;
+  --ifm-link-hover-color: #c9fd54;
+
+  --ifm-toc-border-color: #2a2a2a;
+  --ifm-hr-border-color: #2a2a2a;
+  --ifm-color-emphasis-300: #2a2a2a;
+
+  --docusaurus-highlighted-code-line-bg: rgba(172, 249, 1, 0.08);
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #acf901;
+  --ifm-color-primary-dark: #9ae001;
+  --ifm-color-primary-darker: #91d301;
+  --ifm-color-primary-darkest: #78ae01;
+  --ifm-color-primary-light: #b4fa1a;
+  --ifm-color-primary-lighter: #bafc29;
+  --ifm-color-primary-lightest: #c9fd54;
+
+  --ifm-background-color: #000000;
+  --ifm-background-surface-color: #0d0d0d;
+  --ifm-navbar-background-color: #000000;
+  --ifm-footer-background-color: #000000;
+  --ifm-color-content: #e0e0e0;
+  --ifm-heading-color: #ffffff;
+
+  --docusaurus-highlighted-code-line-bg: rgba(172, 249, 1, 0.08);
+}
+
+/* ─── Global ──────────────────────────────────────────────────────────────── */
+
+html, body {
+  background: #000000;
+  font-family: 'Space Grotesk', sans-serif;
+}
+
+/* ─── Navbar ──────────────────────────────────────────────────────────────── */
+
+.navbar {
+  border-bottom: 1px solid #2a2a2a;
+  backdrop-filter: blur(12px);
+  background: rgba(0, 0, 0, 0.85);
+}
+
+.navbar__title {
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: 0.04em;
+  color: #acf901;
+  text-transform: uppercase;
+}
+
+.navbar__link {
+  font-weight: 500;
+  font-size: 0.85rem;
+  color: #888888;
+  letter-spacing: 0.02em;
+  transition: color 0.2s;
+}
+
+.navbar__link:hover,
+.navbar__link--active {
+  color: #acf901;
+}
+
+.navbar-app-link {
+  background: #acf901;
+  color: #000000 !important;
+  border-radius: 6px;
+  padding: 6px 16px !important;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.navbar-app-link:hover {
+  background: #c9fd54;
+  color: #000000 !important;
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+
+/* ─── Sidebar ─────────────────────────────────────────────────────────────── */
+
+.theme-doc-sidebar-container {
+  border-right: 1px solid #2a2a2a !important;
+}
+
+nav.menu {
+  background: #000000;
+}
+
+.menu__link {
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: #888888;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.menu__link:hover {
+  color: #acf901;
+  background: rgba(172, 249, 1, 0.05);
+}
+
+.menu__link--active:not(.menu__link--sublist) {
+  color: #acf901;
+  background: rgba(172, 249, 1, 0.1);
+  border-left: 2px solid #acf901;
+  font-weight: 600;
+}
+
+.menu__list-item-collapsible .menu__link {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  color: rgba(172, 249, 1, 0.7);
+}
+
+/* ─── Content ─────────────────────────────────────────────────────────────── */
+
+.markdown h1 {
+  font-size: 2rem;
+  color: #acf901;
+  letter-spacing: -0.01em;
+}
+
+.markdown h2 {
+  font-size: 1.5rem;
+  color: #ffffff;
+  border-bottom: 1px solid #2a2a2a;
+  padding-bottom: 0.5rem;
+}
+
+.markdown h3 {
+  color: #ffffff;
+}
+
+.markdown strong {
+  color: #ffffff;
+}
+
+.markdown code {
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  color: #acf901;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 0.85em;
+}
+
+.markdown pre code {
+  border: none;
+  padding: 0;
+}
+
+/* Code blocks */
+pre {
+  background: #0d0d0d !important;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+}
+
+/* ─── Table of contents ───────────────────────────────────────────────────── */
+
+.table-of-contents__link {
+  color: #888888;
+  font-size: 0.8rem;
+}
+
+.table-of-contents__link:hover,
+.table-of-contents__link--active {
+  color: #acf901;
+}
+
+/* ─── Admonitions ─────────────────────────────────────────────────────────── */
+
+.alert {
+  border-radius: 8px;
+  border: 1px solid #2a2a2a;
+  background: #0d0d0d;
+}
+
+.alert--info {
+  border-left: 4px solid #acf901;
+}
+
+.alert--warning {
+  border-left: 4px solid #ffaa00;
+}
+
+.alert--danger {
+  border-left: 4px solid #ff4444;
+}
+
+.alert--success {
+  border-left: 4px solid #acf901;
+}
+
+/* ─── Footer ──────────────────────────────────────────────────────────────── */
+
+.footer {
+  border-top: 1px solid #2a2a2a;
+}
+
+.footer__title {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.footer__link-item {
+  font-size: 0.85rem;
+  transition: color 0.2s;
+}
+
+.footer__link-item:hover {
+  color: #acf901;
+}
+
+.footer__copyright {
+  font-size: 0.75rem;
+  color: #444444;
+}
+
+/* ─── Pagination ──────────────────────────────────────────────────────────── */
+
+.pagination-nav__link {
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  background: #0d0d0d;
+  transition: border-color 0.2s;
+}
+
+.pagination-nav__link:hover {
+  border-color: #acf901;
+}
+
+.pagination-nav__sublabel {
+  color: #888888;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.pagination-nav__label {
+  color: #acf901;
+}
+
+/* ─── Breadcrumbs ─────────────────────────────────────────────────────────── */
+
+.breadcrumbs__link {
+  color: #888888;
+  font-size: 0.8rem;
+}
+
+.breadcrumbs__link:hover {
+  color: #acf901;
+}
+
+/* ─── Search / DocSearch ──────────────────────────────────────────────────── */
+
+.DocSearch-Button {
+  border: 1px solid #2a2a2a !important;
+  background: #0d0d0d !important;
+  border-radius: 8px !important;
+}
+
+/* ─── Scrollbar ───────────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #000000;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2a2a2a;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #acf901;
+}
+
+/* ─── Table ───────────────────────────────────────────────────────────────── */
+
+table {
+  border-collapse: collapse;
+}
+
+table th {
+  background: #0d0d0d;
+  color: #acf901;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border: 1px solid #2a2a2a;
+}
+
+table td {
+  border: 1px solid #2a2a2a;
+  font-size: 0.9rem;
+}
+
+table tr:nth-child(even) {
+  background: rgba(13, 13, 13, 0.5);
+}
