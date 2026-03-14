@@ -79,36 +79,7 @@ const config: Config = {
         },
       ],
     },
-    footer: {
-      style: 'dark',
-      links: [
-        {
-          title: 'Documentation',
-          items: [
-            { label: 'Introduction', to: '/' },
-            { label: 'Getting Started', to: '/getting-started/quickstart' },
-            { label: 'Architecture', to: '/architecture/overview' },
-          ],
-        },
-        {
-          title: 'Protocol',
-          items: [
-            { label: 'Smart Contracts', to: '/smart-contracts/shielded-pool' },
-            { label: 'Client SDK', to: '/sdk/overview' },
-            { label: 'Security', to: '/security/threat-model' },
-          ],
-        },
-        {
-          title: 'Community',
-          items: [
-            { label: 'Twitter', href: 'https://x.com/shroudnetwork' },
-            { label: 'Telegram', href: 'https://t.me/+CQMq831HnFo2ZDRl' },
-            { label: 'Explorer', href: 'https://testnet.snowtrace.io' },
-          ],
-        },
-      ],
-      copyright: `© ${new Date().getFullYear()} Shroud Network. Built on Avalanche. Powered by ZK-SNARKs.`,
-    },
+    footer: {},
     prism: {
       theme: prismThemes.github,
       darkTheme: prismThemes.dracula,
