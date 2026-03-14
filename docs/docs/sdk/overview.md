@@ -5,6 +5,10 @@ title: SDK Overview
 
 # Client SDK
 
+:::info Coming Soon
+The Shroud Network SDK is currently under active development and will be available as a standalone npm package soon. The documentation below describes the architecture and modules that will be included.
+:::
+
 The Shroud Network client SDK is a TypeScript library that handles all client-side operations: key management, note handling, proof generation, and transaction construction.
 
 ## Modules
