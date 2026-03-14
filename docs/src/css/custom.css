@@ -182,12 +182,13 @@ nav.menu {
   color: #acf901;
   border-radius: 4px;
   padding: 2px 6px;
-  font-size: 0.85em;
+  font-size: 0.9em;
 }
 
 .markdown pre code {
   border: none;
   padding: 0;
+  font-size: 0.95rem;
 }
 
 /* Code blocks */
@@ -195,6 +196,37 @@ pre {
   background: #0d0d0d !important;
   border: 1px solid #2a2a2a;
   border-radius: 8px;
+  padding: 20px 16px 20px 20px !important;
+  font-size: 0.95rem !important;
+}
+
+/* Copy button */
+.prism-code + button,
+button[class*="copyButton"] {
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 4px;
+  color: #888888;
+  transition: all 0.2s;
+}
+
+button[class*="copyButton"]:hover {
+  background: #2a2a2a;
+  color: #acf901;
+  border-color: #acf901;
+}
+
+/* Ensure code block container has room for copy button */
+div[class*="codeBlockContainer"] {
+  position: relative;
+}
+
+div[class*="codeBlockTitle"] {
+  background: #0d0d0d !important;
+  border-bottom: 1px solid #2a2a2a;
+  color: #888888;
+  font-size: 0.8rem;
+  padding: 8px 16px;
 }
 
 /* ─── Table of contents ───────────────────────────────────────────────────── */
