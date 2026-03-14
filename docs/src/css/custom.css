@@ -233,31 +233,10 @@ pre {
   border-left: 4px solid #acf901;
 }
 
-/* ─── Footer ──────────────────────────────────────────────────────────────── */
+/* ─── Custom Footer ───────────────────────────────────────────────────────── */
 
-.footer {
-  border-top: 1px solid #2a2a2a;
-}
-
-.footer__title {
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.footer__link-item {
-  font-size: 0.85rem;
-  transition: color 0.2s;
-}
-
-.footer__link-item:hover {
-  color: #acf901;
-}
-
-.footer__copyright {
-  font-size: 0.75rem;
-  color: #444444;
+.footer-custom-link:hover {
+  color: #acf901 !important;
 }
 
 /* ─── Pagination ──────────────────────────────────────────────────────────── */
