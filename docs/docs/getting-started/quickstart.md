@@ -9,13 +9,13 @@ Get up and running with Shroud Network in under 5 minutes.
 
 ## Prerequisites
 
-- A browser wallet (Core, MetaMask, Rabby, etc.)
-- Avalanche Fuji testnet configured in your wallet
-- Test AVAX for gas (or use gasless mode)
+- An email address (for sign-in)
+- A browser wallet like MetaMask (only for deposits)
+- Test AVAX for gas (or use gasless mode for deposits)
 
-## Step 1: Connect your wallet
+## Step 1: Sign in with email
 
-Visit [shroudnetwork.xyz](https://shroudnetwork.xyz) and click **Connect Wallet**. The app will prompt you to switch to Avalanche Fuji testnet if you're on a different network.
+Visit [shroudnetwork.xyz](https://shroudnetwork.xyz) and click **Sign In**. Enter your email and complete the OTP verification. Your Shroud keypair will be generated automatically.
 
 ## Step 2: Get test tokens
 
@@ -24,7 +24,8 @@ Navigate to the **Faucet** tab. You can mint test tokens (SRD) for free — add 
 ## Step 3: Deposit into the shielded pool
 
 1. Go to the **Deposit** tab
-2. Enter the amount you want to shield
+2. Click **Connect Wallet** to connect your MetaMask (needed for ERC20 transfers)
+3. Enter the amount you want to shield
 3. Choose your gas payment method:
    - **Pay Gas (AVAX)** — standard transaction, you pay gas in AVAX
    - **Gasless (Token Fee)** — relay-based, a small fee is deducted from your deposit in tokens
