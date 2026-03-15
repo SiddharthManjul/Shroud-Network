@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import { FuturisticButton } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
-import { useWallet } from "@/hooks/use-wallet";
+import { useAuth } from "@/providers/auth-provider";
 
 const ShroudAnim = dynamic(
   () => import('./ShroudAnim').then((m) => m.ShroudAnim),
@@ -15,7 +15,7 @@ const ShroudAnim = dynamic(
 
 
 export const HeroSection = () => {
-  const { connect, connecting } = useWallet();
+  const { login, ready } = useAuth();
 
   return (
     <div className="relative h-screen w-full overflow-hidden">
@@ -71,10 +71,10 @@ export const HeroSection = () => {
               className="w-full sm:w-auto backdrop-blur-sm bg-black/50 text-[#acf901]"
               borderColor="rgba(172,249,1,1)"
               borderWidth={2}
-              onClick={connect}
-              disabled={connecting}
+              onClick={login}
+              disabled={!ready}
             >
-              {connecting ? "Connecting…" : "Launch App"}
+              Launch App
               <ArrowRight className="ml-2 h-4 w-4" />
             </FuturisticButton>
           </motion.div>
