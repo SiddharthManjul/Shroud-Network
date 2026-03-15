@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
-import { useState } from "react";
-import { Contract, Interface, parseUnits } from "ethers";
+import { useRef, useState } from "react";
+import { Contract, JsonRpcProvider, parseUnits } from "ethers";
 import { useWallet } from "@/hooks/use-wallet";
 import { useToken } from "@/providers/token-provider";
 import { POOL_REGISTRY_ABI } from "@/lib/zktoken/abi/pool-registry";
@@ -22,9 +22,18 @@ const ERC20_META_ABI = [
   "function name() view returns (string)",
 ];
 
+const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL ?? "https://api.avax-test.network/ext/bc/C/rpc";
+
 export function CreatePoolForm() {
-  const { address, signer, provider } = useWallet();
+  const { address, signer, connect: connectWallet, connecting: walletConnecting, disconnect: disconnectWallet } = useWallet();
   const { refresh, tokens } = useToken();
+
+  // Read-only provider for lookups (no wallet needed)
+  const readProviderRef = useRef<JsonRpcProvider | null>(null);
+  if (!readProviderRef.current) {
+    readProviderRef.current = new JsonRpcProvider(RPC_URL);
+  }
+  const readProvider = readProviderRef.current;
   const [tokenAddress, setTokenAddress] = useState("");
   const [tokenMeta, setTokenMeta] = useState<{
     symbol: string;
@@ -37,12 +46,12 @@ export function CreatePoolForm() {
 
   // Look up token metadata when address changes
   const handleLookup = async () => {
-    if (!provider || !tokenAddress || tokenAddress.length !== 42) return;
+    if (!tokenAddress || tokenAddress.length !== 42) return;
     setLookingUp(true);
     setTokenMeta(null);
     setStatus(null);
     try {
-      const erc20 = new Contract(tokenAddress, ERC20_META_ABI, provider);
+      const erc20 = new Contract(tokenAddress, ERC20_META_ABI, readProvider);
       const [symbol, decimals, name] = await Promise.all([
         erc20.symbol(),
         erc20.decimals(),
@@ -131,6 +140,41 @@ export function CreatePoolForm() {
 
   return (
     <form onSubmit={handleCreatePool} className="space-y-4">
+      {/* Wallet status — pool creation requires a wallet to pay gas */}
+      <div className="rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] p-4">
+        {address ? (
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-[#888888]">External Wallet (for pool creation)</p>
+              <p className="text-sm font-mono text-[#acf901]">
+                {address.slice(0, 6)}...{address.slice(-4)}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={disconnectWallet}
+              className="rounded-lg border border-[#acf901]/30 px-3 py-1.5 text-sm text-[#acf901]/80 hover:bg-[#acf901]/10 transition-colors"
+            >
+              Disconnect
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-[#888888]">
+              Connect an external wallet to create pools. Token lookup works without a wallet.
+            </p>
+            <button
+              type="button"
+              onClick={connectWallet}
+              disabled={walletConnecting}
+              className="rounded-lg bg-[#b0b0b0] px-4 py-2 text-sm font-medium text-black hover:bg-[#acf901] hover:text-black border border-[#b0b0b0] hover:border-[#acf901] disabled:opacity-40 transition-colors duration-200"
+            >
+              {walletConnecting ? "Connecting..." : "Connect Wallet"}
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Quick-fill buttons */}
       <div>
         <label className="block text-sm font-medium text-[#888888] mb-1">
@@ -167,7 +211,7 @@ export function CreatePoolForm() {
             type="button"
             onClick={handleLookup}
             disabled={
-              lookingUp || !provider || !tokenAddress || tokenAddress.length !== 42
+              lookingUp || !tokenAddress || tokenAddress.length !== 42
             }
             className="shrink-0 rounded-lg bg-[#b0b0b0] px-4 py-2 text-sm font-medium text-black hover:bg-[#acf901] hover:text-black border border-[#b0b0b0] hover:border-[#acf901] disabled:opacity-40 transition-colors duration-200"
           >
