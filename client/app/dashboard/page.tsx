@@ -119,7 +119,7 @@ export default function DashboardPage() {
               setScanStatus("Scan complete.");
               setTimeout(() => setScanStatus(null), 3000);
             }}
-            disabled={loading || !address || !keypair}
+            disabled={loading || !keypair}
             className="group rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] p-4 hover:border-[#acf901]/50 hover:bg-[#acf901]/5 transition-all duration-200 text-left disabled:opacity-40"
           >
             <p className="font-semibold text-[#acf901]">
