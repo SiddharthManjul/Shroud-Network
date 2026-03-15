@@ -2,7 +2,6 @@
 
 import { useRef, useState } from "react";
 import { useNotes } from "@/hooks/use-notes";
-import { useWallet } from "@/hooks/use-wallet";
 import { useShieldedKey } from "@/hooks/use-shielded-key";
 import { NoteList } from "@/components/note-list";
 import {
@@ -13,7 +12,6 @@ import {
 export default function NotesPage() {
   const { notes, unspent, clearAll, loading, refreshNotes, saveNote, persist } =
     useNotes();
-  const { address } = useWallet();
   const { keypair } = useShieldedKey();
   const [scanStatus, setScanStatus] = useState<string | null>(null);
   const [backupStatus, setBackupStatus] = useState<string | null>(null);
@@ -79,7 +77,7 @@ export default function NotesPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {address && keypair && (
+          {keypair && (
             <button
               onClick={async () => {
                 setScanStatus("Scanning...");
