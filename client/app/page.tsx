@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useWallet } from "@/hooks/use-wallet";
+import { useAuth } from "@/providers/auth-provider";
 import { FuturisticButton } from "@/components/ui/button";
 import Image from "next/image";
 import { NewsTicker } from "@/components/news-ticker";
@@ -22,18 +22,7 @@ const Background3D = dynamic(
 /*  LANDING NAV                                               */
 /* ────────────────────────────────────────────────────────── */
 function LandingNav() {
-  const { connect, connecting } = useWallet();
-  const [error, setError] = useState<string | null>(null);
-
-  const handleConnect = async () => {
-    setError(null);
-    try {
-      await connect();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Connection failed");
-      setTimeout(() => setError(null), 5000);
-    }
-  };
+  const { login, ready } = useAuth();
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-[#1a1a1a] bg-black/80 backdrop-blur-md">
@@ -56,21 +45,16 @@ function LandingNav() {
           <FuturisticButton
             variant="outline"
             size="sm"
-            onClick={handleConnect}
-            disabled={connecting}
+            onClick={login}
+            disabled={!ready}
             borderColor="rgba(172,249,1,0.8)"
             borderWidth={1.5}
             className="text-[#acf901] text-xs font-semibold tracking-wider uppercase"
           >
-            {connecting ? "Connecting…" : "Connect Wallet"}
+            Sign In
           </FuturisticButton>
         </div>
       </div>
-      {error && (
-        <div className="bg-red-900/80 text-white text-xs text-center py-1.5 px-4">
-          {error}
-        </div>
-      )}
     </header>
   );
 }
