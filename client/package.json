@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@privy-io/react-auth": "^3.17.0",
     "@types/three": "^0.183.1",
     "animejs": "^4.3.6",
     "circomlibjs": "^0.1.7",
