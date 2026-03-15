@@ -100,7 +100,7 @@ export function FaucetForm() {
       <div className="space-y-4">
         <h2 className="text-lg font-semibold text-[#acf901]">Add {tokenSymbol} to Wallet</h2>
         <button type="button" onClick={addToWallet} className={btnSecondary}>
-          Add to MetaMask
+          Add to Wallet
         </button>
         <div className="rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] p-4 space-y-2 text-sm">
           <div className="flex justify-between">
