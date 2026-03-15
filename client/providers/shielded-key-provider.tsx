@@ -10,7 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useWallet } from "@/hooks/use-wallet";
+import { useAuth } from "@/providers/auth-provider";
 import type { BabyJubKeyPair } from "@/lib/zktoken/types";
 import type { VaultMethod, VaultStatus } from "@/lib/zktoken/key-vault";
 
@@ -55,17 +55,18 @@ export function useShieldedKeyContext() {
 /**
  * ShieldedKeyProvider — Shared Baby Jubjub keypair state.
  *
- * The private key is encrypted at rest using either:
- *   - WebAuthn passkey (biometrics / device unlock) — preferred
- *   - 6-digit PIN via PBKDF2 — fallback
+ * Key derivation now uses the Privy embedded wallet signature instead of
+ * an external wallet. The user's email auth (via Privy) creates a deterministic
+ * embedded wallet, whose signature on a fixed message produces the same
+ * Baby Jubjub key every time.
  *
  * Flow:
- *   1. First use: wallet signature → derive key → choose security method → encrypt & store
+ *   1. First use: Privy embedded wallet signature → derive key → choose security method → encrypt & store
  *   2. Subsequent use: biometric prompt or PIN entry → decrypt → keypair in memory
  *   3. Session: keypair stays in memory until page reload or lock()
  */
 export function ShieldedKeyProvider({ children }: { children: ReactNode }) {
-  const { address, signer } = useWallet();
+  const { authenticated, userId, signWithEmbeddedWallet } = useAuth();
   const [keypair, setKeypair] = useState<BabyJubKeyPair | null>(null);
   const [deriving, setDeriving] = useState(false);
   const [vaultStatus, setVaultStatus] = useState<VaultStatus>({ exists: false, method: null });
@@ -75,9 +76,12 @@ export function ShieldedKeyProvider({ children }: { children: ReactNode }) {
   const derivedForRef = useRef<string | null>(null);
   const pendingKeyRef = useRef<string | null>(null);
 
-  // Check vault status when address changes
+  // Use Privy userId as the vault identifier (stable across sessions)
+  const vaultId = userId ?? null;
+
+  // Check vault status when auth changes
   useEffect(() => {
-    if (!address) {
+    if (!authenticated || !vaultId) {
       setKeypair(null);
       setVaultStatus({ exists: false, method: null });
       setNeedsSetup(false);
@@ -88,21 +92,21 @@ export function ShieldedKeyProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    if (derivedForRef.current === address) return;
+    if (derivedForRef.current === vaultId) return;
 
     (async () => {
       const { getVaultStatus, getPlaintextKeyForMigration } = await import(
         "@/lib/zktoken/key-vault"
       );
 
-      const status = getVaultStatus(address);
+      const status = getVaultStatus(vaultId);
       setVaultStatus(status);
 
       if (status.exists) {
         setNeedsUnlock(true);
         setNeedsSetup(false);
       } else {
-        const oldKey = getPlaintextKeyForMigration(address);
+        const oldKey = getPlaintextKeyForMigration(vaultId);
         if (oldKey) {
           pendingKeyRef.current = oldKey;
           setNeedsSetup(true);
@@ -110,10 +114,10 @@ export function ShieldedKeyProvider({ children }: { children: ReactNode }) {
         }
       }
     })();
-  }, [address]);
+  }, [authenticated, vaultId]);
 
   const deriveKey = useCallback(async () => {
-    if (!signer || !address) return null;
+    if (!authenticated || !vaultId) return null;
 
     setDeriving(true);
     setError(null);
@@ -121,8 +125,10 @@ export function ShieldedKeyProvider({ children }: { children: ReactNode }) {
       const { KeyManager, SUBGROUP_ORDER } = await import("@/lib/zktoken/keys");
       const { keccak256, toUtf8Bytes } = await import("ethers");
 
-      const message = "zktoken-shielded-key-v1:" + address.toLowerCase();
-      const signature = await signer.signMessage(message);
+      // Sign a deterministic message with the Privy embedded wallet.
+      // Same email → same embedded wallet → same signature → same Baby Jubjub key.
+      const message = "shroud-shielded-key-v1:" + vaultId;
+      const signature = await signWithEmbeddedWallet(message);
 
       const hash = keccak256(toUtf8Bytes(signature));
       let privKey = BigInt(hash) % SUBGROUP_ORDER;
@@ -140,11 +146,11 @@ export function ShieldedKeyProvider({ children }: { children: ReactNode }) {
     } finally {
       setDeriving(false);
     }
-  }, [signer, address]);
+  }, [authenticated, vaultId, signWithEmbeddedWallet]);
 
   const setupVault = useCallback(
     async (method: VaultMethod, pin?: string) => {
-      if (!address || !pendingKeyRef.current) return;
+      if (!vaultId || !pendingKeyRef.current) return;
 
       setError(null);
       try {
@@ -154,15 +160,15 @@ export function ShieldedKeyProvider({ children }: { children: ReactNode }) {
         const privKeyHex = pendingKeyRef.current;
 
         if (method === "passkey") {
-          await storeWithPasskey(address, privKeyHex);
+          await storeWithPasskey(vaultId, privKeyHex);
         } else {
           if (!pin) throw new Error("PIN required");
-          await storeWithPIN(address, privKeyHex, pin);
+          await storeWithPIN(vaultId, privKeyHex, pin);
         }
 
         const kp = await KeyManager.fromPrivateKey(privKeyHex);
         setKeypair(kp);
-        derivedForRef.current = address;
+        derivedForRef.current = vaultId;
         pendingKeyRef.current = null;
         setNeedsSetup(false);
         setNeedsUnlock(false);
@@ -174,23 +180,23 @@ export function ShieldedKeyProvider({ children }: { children: ReactNode }) {
         return null;
       }
     },
-    [address]
+    [vaultId]
   );
 
   const unlockVault = useCallback(
     async (pin?: string) => {
-      if (!address) return null;
+      if (!vaultId) return null;
 
       setError(null);
       try {
         const { unlock } = await import("@/lib/zktoken/key-vault");
         const { KeyManager } = await import("@/lib/zktoken/keys");
 
-        const privKeyHex = await unlock(address, pin);
+        const privKeyHex = await unlock(vaultId, pin);
         const kp = await KeyManager.fromPrivateKey(privKeyHex);
 
         setKeypair(kp);
-        derivedForRef.current = address;
+        derivedForRef.current = vaultId;
         setNeedsUnlock(false);
 
         return kp;
@@ -200,7 +206,7 @@ export function ShieldedKeyProvider({ children }: { children: ReactNode }) {
         return null;
       }
     },
-    [address]
+    [vaultId]
   );
 
   const lock = useCallback(() => {
@@ -212,16 +218,16 @@ export function ShieldedKeyProvider({ children }: { children: ReactNode }) {
   }, [vaultStatus.exists]);
 
   const resetVault = useCallback(async () => {
-    if (!address) return;
+    if (!vaultId) return;
     const { deleteVault } = await import("@/lib/zktoken/key-vault");
-    deleteVault(address);
+    deleteVault(vaultId);
     setKeypair(null);
     derivedForRef.current = null;
     pendingKeyRef.current = null;
     setVaultStatus({ exists: false, method: null });
     setNeedsSetup(false);
     setNeedsUnlock(false);
-  }, [address]);
+  }, [vaultId]);
 
   return (
     <ShieldedKeyContext.Provider
