@@ -57,3 +57,5 @@ Shroud Network currently operates on **Avalanche Fuji Testnet** (Chain ID 43113)
 ---
 
 Ready to get started? Head to the [Quickstart guide](/getting-started/quickstart).
+
+Migrating from a wallet-based account? See the [Migration Guide](/migration).
