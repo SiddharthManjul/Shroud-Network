@@ -5,10 +5,11 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import type { ReactNode } from "react";
-import { useWallet } from "@/hooks/use-wallet";
+import { JsonRpcProvider } from "ethers";
 import type { PoolInfo } from "@/lib/zktoken/registry";
 
 const STORAGE_KEY = "zktoken_active_token";
@@ -39,16 +40,22 @@ export function useToken() {
 }
 
 export function TokenProvider({ children }: { children: ReactNode }) {
-  const { provider } = useWallet();
   const [tokens, setTokens] = useState<PoolInfo[]>([]);
   const [activeToken, setActiveTokenState] = useState<PoolInfo | null>(null);
   const [loading, setLoading] = useState(false);
 
   const registryAddress =
     process.env.NEXT_PUBLIC_POOL_REGISTRY_ADDRESS ?? "";
+  const rpcUrl = process.env.NEXT_PUBLIC_RPC_URL ?? "https://api.avax-test.network/ext/bc/C/rpc";
+
+  // Stable read-only provider for registry queries (no wallet needed)
+  const readProviderRef = useRef<JsonRpcProvider | null>(null);
+  if (!readProviderRef.current) {
+    readProviderRef.current = new JsonRpcProvider(rpcUrl);
+  }
 
   const fetchPools = useCallback(async () => {
-    if (!provider || !registryAddress) {
+    if (!registryAddress) {
       // Fallback: construct a single pool from legacy env vars
       const poolAddr = process.env.NEXT_PUBLIC_SHIELDED_POOL_ADDRESS ?? "";
       const tokenAddr = process.env.NEXT_PUBLIC_TOKEN_ADDRESS ?? "";
@@ -71,7 +78,7 @@ export function TokenProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     try {
       const { fetchAllPools } = await import("@/lib/zktoken/registry");
-      const pools = await fetchAllPools(registryAddress, provider);
+      const pools = await fetchAllPools(registryAddress, readProviderRef.current!);
       setTokens(pools);
 
       if (pools.length > 0) {
@@ -108,7 +115,7 @@ export function TokenProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [provider, registryAddress]);
+  }, [registryAddress]);
 
   useEffect(() => {
     fetchPools();
