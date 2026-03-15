@@ -45,6 +45,12 @@ function useSupressPrivyWalletErrors() {
 export function PrivyProvider({ children }: { children: ReactNode }) {
   useSupressPrivyWalletErrors();
 
+  // During SSR/prerender the app ID may be empty — render children without
+  // the Privy SDK so static pages (like _not-found) can build successfully.
+  if (!PRIVY_APP_ID) {
+    return <>{children}</>;
+  }
+
   return (
     <PrivySDKProvider
       appId={PRIVY_APP_ID}
