@@ -20,6 +20,8 @@ const CHAIN_NAMES: Record<number, string> = {
   1: "Ethereum Mainnet",
 };
 
+const WALLET_CONNECTED_KEY = "shroud_wallet_connected";
+
 interface WalletContextValue {
   address: string | null;
   signer: JsonRpcSigner | null;
@@ -69,7 +71,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         params: [{ chainId: hexChainId }],
       });
     } catch (err: unknown) {
-      // Chain not added to wallet — try adding Fuji
       if ((err as { code?: number })?.code === 4902 && EXPECTED_CHAIN_ID === 43113) {
         await window.ethereum.request({
           method: "wallet_addEthereumChain",
@@ -109,13 +110,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       setAddress(addr);
       setChainId(network.chainId);
     } catch {
-      // Ignore — wallet may be locked
+      // Ignore — wallet may be locked or provider incompatible
     }
   }, []);
 
   const connect = useCallback(async () => {
     if (!window.ethereum) {
-      // No injected wallet — on mobile, deep-link to MetaMask's in-app browser
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       if (isMobile) {
         const dappUrl = window.location.href.replace(/^https?:\/\//, "");
@@ -127,7 +127,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       );
     }
 
-    // Prevent concurrent eth_requestAccounts calls
     if (connectingRef.current) return;
     connectingRef.current = true;
     setConnecting(true);
@@ -144,7 +143,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       setAddress(addr);
       setChainId(network.chainId);
 
-      // Prompt network switch if on wrong chain (only on explicit connect)
+      // Persist that user has connected an external wallet
+      localStorage.setItem(WALLET_CONNECTED_KEY, "true");
+
       if (Number(network.chainId) !== EXPECTED_CHAIN_ID) {
         try {
           await switchToExpectedNetwork();
@@ -163,25 +164,32 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setSigner(null);
     setProvider(null);
     setChainId(null);
+    localStorage.removeItem(WALLET_CONNECTED_KEY);
   }, []);
+
+  // Auto-reconnect on mount if user previously connected an external wallet
+  useEffect(() => {
+    const wasConnected = localStorage.getItem(WALLET_CONNECTED_KEY) === "true";
+    if (wasConnected && window.ethereum) {
+      refreshState();
+    }
+  }, [refreshState]);
 
   // Listen for account/chain changes
   useEffect(() => {
     const eth = window.ethereum;
-    if (!eth) return;
+    if (!eth || typeof eth.on !== "function") return;
 
     const handleAccountsChanged = (...args: unknown[]) => {
       const accounts = args[0] as string[];
       if (accounts.length === 0) {
         disconnect();
       } else {
-        // Refresh state without prompting eth_requestAccounts again
         refreshState();
       }
     };
 
     const handleChainChanged = () => {
-      // Refresh state without prompting eth_requestAccounts or network switch
       refreshState();
     };
 
@@ -189,14 +197,15 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       eth.on("accountsChanged", handleAccountsChanged);
       eth.on("chainChanged", handleChainChanged);
     } catch {
-      // Provider doesn't support event listeners
       return;
     }
 
     return () => {
       try {
-        eth.removeListener("accountsChanged", handleAccountsChanged);
-        eth.removeListener("chainChanged", handleChainChanged);
+        if (typeof eth.removeListener === "function") {
+          eth.removeListener("accountsChanged", handleAccountsChanged);
+          eth.removeListener("chainChanged", handleChainChanged);
+        }
       } catch {
         // ignore
       }
