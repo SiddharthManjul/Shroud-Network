@@ -36,7 +36,7 @@ function computeFee(amount: bigint): bigint {
 
 export function DepositForm() {
   const { ready } = useZkToken();
-  const { address, signer, provider, connect: connectWallet, connecting: walletConnecting } = useWallet();
+  const { address, signer, provider, connect: connectWallet, connecting: walletConnecting, disconnect: disconnectWallet } = useWallet();
   const { notes, saveNote } = useNotes();
   const { keypair, deriveKey } = useShieldedKey();
   const { activeToken } = useToken();
@@ -214,22 +214,40 @@ export function DepositForm() {
 
   return (
     <form onSubmit={handleDeposit} className="space-y-4">
-      {/* Wallet connect prompt — deposits require an external wallet for ERC20 transfers */}
-      {!address && (
-        <div className="rounded-lg border border-[#acf901]/30 bg-[#acf901]/5 p-4 space-y-3">
-          <p className="text-sm text-[#888888]">
-            Deposits require an external wallet (MetaMask) to transfer ERC20 tokens into the shielded pool.
-          </p>
-          <button
-            type="button"
-            onClick={connectWallet}
-            disabled={walletConnecting}
-            className="rounded-lg bg-[#b0b0b0] px-4 py-2 text-sm font-medium text-black hover:bg-[#acf901] hover:text-black border border-[#b0b0b0] hover:border-[#acf901] disabled:opacity-40 transition-colors duration-200"
-          >
-            {walletConnecting ? "Connecting..." : "Connect Wallet for Deposits"}
-          </button>
-        </div>
-      )}
+      {/* Wallet status — deposits require an external wallet for ERC20 transfers */}
+      <div className="rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] p-4">
+        {address ? (
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-[#888888]">External Wallet (for deposits)</p>
+              <p className="text-sm font-mono text-[#acf901]">
+                {address.slice(0, 6)}...{address.slice(-4)}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={disconnectWallet}
+              className="rounded-lg border border-[#acf901]/30 px-3 py-1.5 text-sm text-[#acf901]/80 hover:bg-[#acf901]/10 transition-colors"
+            >
+              Disconnect
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-[#888888]">
+              Connect an external wallet (MetaMask) to transfer ERC20 tokens into the shielded pool.
+            </p>
+            <button
+              type="button"
+              onClick={connectWallet}
+              disabled={walletConnecting}
+              className="rounded-lg bg-[#b0b0b0] px-4 py-2 text-sm font-medium text-black hover:bg-[#acf901] hover:text-black border border-[#b0b0b0] hover:border-[#acf901] disabled:opacity-40 transition-colors duration-200"
+            >
+              {walletConnecting ? "Connecting..." : "Connect Wallet"}
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Relay mode toggle — only shown when MetaTxRelayer is configured */}
       {relayAvailable && (
