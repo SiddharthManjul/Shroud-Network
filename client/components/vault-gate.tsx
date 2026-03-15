@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useShieldedKey } from "@/hooks/use-shielded-key";
-import { useWallet } from "@/hooks/use-wallet";
+import { useAuth } from "@/providers/auth-provider";
 import { PinInput } from "./pin-input";
 import type { VaultMethod } from "@/lib/zktoken/key-vault";
 
@@ -19,14 +19,14 @@ const btnDanger =
  * VaultGate — Renders either the unlock/setup flow or children (app content).
  *
  * States:
- *   1. No wallet → children (wallet connect handled elsewhere)
- *   2. Wallet connected, no vault, no pending key → "Derive Shielded Key" button
- *   3. Wallet connected, pending key (needsSetup) → choose passkey vs PIN → setup
- *   4. Wallet connected, vault exists (needsUnlock) → biometric prompt or PIN entry
+ *   1. Not authenticated → children (auth handled by redirect)
+ *   2. Authenticated, no vault, no pending key → "Derive Shielded Key" button
+ *   3. Authenticated, pending key (needsSetup) → choose passkey vs PIN → setup
+ *   4. Authenticated, vault exists (needsUnlock) → biometric prompt or PIN entry
  *   5. Vault unlocked → children
  */
 export function VaultGate({ children }: { children: React.ReactNode }) {
-  const { address } = useWallet();
+  const { authenticated } = useAuth();
   const {
     keypair,
     deriving,
@@ -41,8 +41,8 @@ export function VaultGate({ children }: { children: React.ReactNode }) {
     clearError,
   } = useShieldedKey();
 
-  // If not connected or already unlocked, render children
-  if (!address || keypair) {
+  // If not authenticated or already unlocked, render children
+  if (!authenticated || keypair) {
     return <>{children}</>;
   }
 
@@ -76,12 +76,12 @@ export function VaultGate({ children }: { children: React.ReactNode }) {
         </div>
         <h2 className="text-lg font-medium text-[#e0e0e0]">Shielded Key Required</h2>
         <p className="text-sm text-[#888888] max-w-sm">
-          Sign a message with your wallet to derive your shielded key.
+          Generate your shielded key to start using the privacy pool.
           You&apos;ll then secure it with biometrics or a PIN.
         </p>
       </div>
       <button onClick={deriveKey} disabled={deriving} className={btnPrimary} style={{ maxWidth: 320 }}>
-        {deriving ? "Signing..." : "Derive Shielded Key"}
+        {deriving ? "Generating..." : "Generate Shielded Key"}
       </button>
       {error && <p className="text-sm text-[#acf901]">{error}</p>}
     </div>
@@ -318,8 +318,8 @@ function UnlockScreen({
         ) : (
           <div className="space-y-3 max-w-xs">
             <p className="text-sm text-[#888888]">
-              This will delete the encrypted key. You can re-derive it by signing
-              with your wallet again.
+              This will delete the encrypted key. You can re-derive it from your
+              email account.
             </p>
             <div className="flex gap-2">
               <button onClick={handleReset} className={btnPrimary}>
