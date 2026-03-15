@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { JsonRpcProvider } from "ethers";
 import { useWallet } from "@/hooks/use-wallet";
 import { useZkToken } from "@/hooks/use-zktoken";
 import { useNotes } from "@/hooks/use-notes";
@@ -37,7 +38,7 @@ function computeFee(amount: bigint): bigint {
 
 export function WithdrawForm() {
   const { ready } = useZkToken();
-  const { address, signer, provider } = useWallet();
+  const { signer, provider } = useWallet();
   const { unspent, saveNote, markSpent } = useNotes();
   const { keypair, deriveKey } = useShieldedKey();
   const { activeToken } = useToken();
@@ -78,7 +79,7 @@ export function WithdrawForm() {
 
   const handleWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!ready || !address || !provider || !selectedNote) return;
+    if (!ready || !selectedNote) return;
 
     const trimmed = amount.trim();
     if (!trimmed || !/^\d+$/.test(trimmed)) {
@@ -180,12 +181,13 @@ export function WithdrawForm() {
       // ── Paymaster relay path (existing flow) ──────────────────────────
       setStatus("Syncing Merkle tree...");
       const { relayWithdraw } = await import("@/lib/zktoken/transaction");
+      const rpcProvider = provider ?? new JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL);
 
       setStatus("Generating ZK proof (this may take a moment)...");
       let result;
       try {
         result = await relayWithdraw({
-          provider: provider as never,
+          provider: rpcProvider as never,
           poolAddress: POOL_ADDRESS,
           inputNote: selectedNote,
           withdrawAmount,
@@ -364,12 +366,10 @@ export function WithdrawForm() {
 
       <button
         type="submit"
-        disabled={!ready || !address || generating || !selectedNote}
+        disabled={!ready || generating || !selectedNote}
         className={btnPrimary}
       >
-        {!address
-          ? "Connect wallet first"
-          : !ready
+        {!ready
           ? "Initializing..."
           : !selectedNote
           ? "Select a note"
