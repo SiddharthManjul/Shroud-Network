@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useWallet } from "@/hooks/use-wallet";
+import { JsonRpcProvider } from "ethers";
 import { useZkToken } from "@/hooks/use-zktoken";
 import { useNotes } from "@/hooks/use-notes";
 import { useShieldedKey } from "@/hooks/use-shielded-key";
@@ -31,7 +31,6 @@ const btnSecondary =
 
 export function TransferForm() {
   const { ready } = useZkToken();
-  const { address, provider } = useWallet();
   const { unspent, saveNote, markSpent } = useNotes();
   const { keypair, deriveKey } = useShieldedKey();
   const { activeToken } = useToken();
@@ -59,7 +58,7 @@ export function TransferForm() {
 
   const handleTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!ready || !address || !provider || !selectedNote) return;
+    if (!ready || !selectedNote) return;
 
     const trimmed = amount.trim();
     if (!trimmed || !/^\d+$/.test(trimmed)) {
@@ -112,8 +111,9 @@ export function TransferForm() {
       setStatus("Generating ZK proof (this may take a moment)...");
       let result;
       try {
+        const rpcProvider = new JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL);
         result = await relayTransfer({
-          provider: provider as never,
+          provider: rpcProvider as never,
           poolAddress: POOL_ADDRESS,
           inputNote: selectedNote,
           transferAmount,
@@ -271,12 +271,10 @@ export function TransferForm() {
       <ProofStatus generating={generating} />
       <button
         type="submit"
-        disabled={!ready || !address || generating || !selectedNote}
+        disabled={!ready || generating || !selectedNote}
         className={btnPrimary}
       >
-        {!address
-          ? "Connect wallet first"
-          : !ready
+        {!ready
           ? "Initializing..."
           : !selectedNote
           ? "Select a note"
