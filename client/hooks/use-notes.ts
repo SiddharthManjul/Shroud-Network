@@ -9,6 +9,13 @@ import { useToken } from "@/providers/token-provider";
 const STORAGE_PREFIX = "zktoken_notes_";
 const SCAN_BLOCK_KEY = "zktoken_last_scan_block";
 
+/**
+ * Track which keypair+token combos have already been auto-scanned this session.
+ * Module-level so it persists across all useNotes() instances (multiple components)
+ * but resets on page reload.
+ */
+const autoScannedKeys = new Set<string>();
+
 /** Derive the localStorage key for a given shielded public key + token address. */
 function storageKeyFor(pkX: bigint, tokenAddress?: string): string {
   const base = STORAGE_PREFIX + pkX.toString(16).slice(0, 16);
@@ -141,6 +148,9 @@ export function useNotes() {
       // Ignore corrupt storage
     }
   }, [keypair, TOKEN_ADDRESS]);
+
+  // Ref to hold latest refreshNotes for the auto-scan effect
+  const refreshRef = useRef<() => Promise<void>>(undefined);
 
   const persist = useCallback(() => {
     const all = storeRef.current.getAll();
@@ -319,6 +329,33 @@ export function useNotes() {
       setLoading(false);
     }
   }, [keypair, persist, TOKEN_ADDRESS, POOL_ADDRESS]);
+
+  // Keep ref in sync so the auto-scan effect always calls the latest version
+  refreshRef.current = refreshNotes;
+
+  // Auto-scan on login: trigger refreshNotes once per keypair+token per session
+  const autoScanTriggered = useRef(false);
+  useEffect(() => {
+    if (!keypair || !POOL_ADDRESS || !TOKEN_ADDRESS) return;
+
+    const scanKey = keypair.publicKey[0].toString(16).slice(0, 16) + "_" + TOKEN_ADDRESS.toLowerCase();
+
+    // Skip if already auto-scanned this session (across all hook instances)
+    if (autoScannedKeys.has(scanKey)) return;
+
+    // Skip if this specific hook instance already triggered (React strict mode double-fire)
+    if (autoScanTriggered.current) return;
+    autoScanTriggered.current = true;
+    autoScannedKeys.add(scanKey);
+
+    // Small delay to let hydration + UI settle before starting background scan
+    const timer = setTimeout(() => {
+      console.log("[use-notes] Auto-scanning notes on login...");
+      refreshRef.current?.();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [keypair, POOL_ADDRESS, TOKEN_ADDRESS]);
 
   return {
     notes,
