@@ -108,11 +108,23 @@ html, body {
   transition: background 0.2s, transform 0.15s;
 }
 
-.navbar-app-link:hover {
-  background: #c9fd54;
+.navbar-app-link:hover,
+.menu__link.navbar-app-link:hover {
+  background: #c9fd54 !important;
   color: #000000 !important;
   text-decoration: none;
   transform: translateY(-1px);
+}
+
+.menu__link.navbar-app-link {
+  background: #acf901;
+  color: #000000 !important;
+  border-radius: 6px;
+  padding: 6px 16px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 /* ─── Sidebar ─────────────────────────────────────────────────────────────── */
@@ -151,6 +163,84 @@ nav.menu {
   font-size: 0.75rem;
   letter-spacing: 0.08em;
   color: rgba(172, 249, 1, 0.7);
+}
+
+/* ─── Mobile sidebar (hamburger menu) ─────────────────────────────────────── */
+
+/* ─── Mobile sidebar (hamburger menu) ───────────────────────────────────── */
+
+.navbar-sidebar {
+  background-color: #000000;
+}
+
+.navbar-sidebar__backdrop {
+  background-color: rgba(0, 0, 0, 0.7);
+}
+
+.navbar-sidebar__brand {
+  background: #000000;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.navbar-sidebar__items {
+  background: #000000;
+  overflow-y: auto;
+}
+
+.navbar-sidebar__item {
+  background: #000000;
+}
+
+/* "← Back to main menu" button */
+.navbar-sidebar__back {
+  color: #acf901;
+  background: rgba(172, 249, 1, 0.05);
+  border-bottom: 1px solid #2a2a2a;
+}
+
+/* Navbar links in the primary panel */
+.navbar-sidebar .navbar__link {
+  color: #e0e0e0;
+  font-size: 0.95rem;
+}
+
+.navbar-sidebar .navbar__link:hover,
+.navbar-sidebar .navbar__link--active {
+  color: #acf901;
+}
+
+/* Doc sidebar menu in the secondary panel */
+.navbar-sidebar .menu {
+  background: #000000;
+}
+
+.navbar-sidebar .menu__link {
+  color: #888888;
+}
+
+.navbar-sidebar .menu__link:hover,
+.navbar-sidebar .menu__link--active {
+  color: #acf901;
+  background: rgba(172, 249, 1, 0.05);
+}
+
+.navbar-sidebar .menu__list-item-collapsible .menu__link {
+  color: rgba(172, 249, 1, 0.7);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+}
+
+/* Category expand/collapse arrow — default is black, invisible on dark bg */
+.menu__link--sublist-caret::after {
+  filter: invert(1) brightness(0.6);
+}
+
+/* Launch App button in mobile drawer */
+.navbar-sidebar .navbar-app-link {
+  display: inline-block;
+  margin: 0.5rem 0.75rem;
 }
 
 /* ─── Content ─────────────────────────────────────────────────────────────── */
