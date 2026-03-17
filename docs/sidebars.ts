@@ -19,6 +19,7 @@ const sidebars: SidebarsConfig = {
       label: 'Architecture',
       items: [
         'architecture/overview',
+        'architecture/terminology',
         'architecture/shielded-pool',
         'architecture/cryptography',
         'architecture/zk-circuits',
