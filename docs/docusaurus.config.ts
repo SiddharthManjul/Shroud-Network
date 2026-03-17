@@ -7,10 +7,6 @@ const config: Config = {
   tagline: 'Privacy redefined with zero-knowledge on Avalanche',
   favicon: 'img/logo.png',
 
-  future: {
-    v4: true,
-  },
-
   url: 'https://docs.shroudnetwork.xyz',
   baseUrl: '/',
 
