@@ -16,6 +16,7 @@ const links: { href: string; label: string; external?: boolean }[] = [
   { href: "/faucet", label: "Faucet" },
   { href: "/migrate", label: "Migrate" },
   { href: "https://docs.shroudnetwork.xyz", label: "Docs", external: true },
+  { href: "https://developers.shroudnetwork.xyz", label: "Developer Portal", external: true },
 ];
 
 export function Nav() {
@@ -24,7 +25,7 @@ export function Nav() {
 
   return (
     <nav className="border-b border-[#2a2a2a] bg-black">
-      <div className="mx-auto flex max-w-screen-2xl items-center justify-between px-4 py-3">
+      <div className="w-full flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-4">
           <Link href="/dashboard" className="flex items-center gap-2 shrink-0 text-lg font-bold text-[#acf901] tracking-wide">
             <Image src="/schrodingerlabs.png" alt="Shroud Network" width={28} height={28} className="rounded-sm" />

@@ -40,6 +40,14 @@ function LandingNav() {
           >
             Docs
           </a>
+          <a
+            href="https://developers.shroudnetwork.xyz"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-md px-3 py-1.5 text-sm font-medium text-[#888888] hover:text-[#acf901] hover:bg-[#acf901]/5 transition-colors duration-200"
+          >
+            Developer Portal
+          </a>
         </div>
         <div className="flex items-center gap-4">
           <FuturisticButton
