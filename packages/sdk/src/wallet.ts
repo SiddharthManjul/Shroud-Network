@@ -112,7 +112,7 @@ async function hkdf(
       false,
       ['sign'],
     ),
-    inputKeyMaterial,
+    inputKeyMaterial.buffer as ArrayBuffer,
   );
 
   const okm = await crypto.subtle.sign(

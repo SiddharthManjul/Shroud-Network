@@ -169,7 +169,7 @@ export async function encryptMemo(
   const ciphertextWithTag = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv: nonce },
     aesKey,
-    plaintext,
+    plaintext.buffer as ArrayBuffer,
   );
 
   // Layout: ek_pub_x (32B) || nonce (12B) || ciphertext+tag (144B)

@@ -53,12 +53,12 @@ export class InvalidKeyError extends ShroudError {
  * An on-chain or RPC request failed.
  */
 export class NetworkError extends ShroudError {
-  readonly statusCode?: number;
+  readonly statusCode: number | undefined;
 
   constructor(message: string, statusCode?: number) {
     super(message, 'NETWORK_ERROR');
     this.name = 'NetworkError';
-    this.statusCode = statusCode;
+    this.statusCode = statusCode ?? undefined;
   }
 }
 
@@ -79,12 +79,12 @@ export class ProofGenerationError extends ShroudError {
  * The relay server rejected or failed to submit the transaction.
  */
 export class RelayError extends ShroudError {
-  readonly relayCode?: string;
+  readonly relayCode: string | undefined;
 
   constructor(message: string, relayCode?: string) {
     super(message, 'RELAY_ERROR');
     this.name = 'RelayError';
-    this.relayCode = relayCode;
+    this.relayCode = relayCode ?? undefined;
   }
 }
 

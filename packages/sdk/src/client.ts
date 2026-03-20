@@ -395,7 +395,7 @@ export class ShroudClient {
         amount,
         recipient,
         changeNote.noteCommitment,
-        changeMemoHex(changeAmount, changeNote, walletState.keypair.publicKey),
+        await changeMemoHex(changeAmount, changeNote, walletState.keypair.publicKey),
       );
     } else {
       txResult = await this.api.relayWithdraw({
@@ -499,9 +499,9 @@ export class ShroudClient {
       maxBlock = Math.max(maxBlock, event.blockNumber);
 
       const memosToTry: Array<{ hex: string; commitmentHint?: string }> = [];
-      if (event.encryptedMemo1) memosToTry.push({ hex: event.encryptedMemo1, commitmentHint: event.newCommitment1 });
-      if (event.encryptedMemo2) memosToTry.push({ hex: event.encryptedMemo2, commitmentHint: event.newCommitment2 });
-      if (event.encryptedMemo) memosToTry.push({ hex: event.encryptedMemo, commitmentHint: event.changeCommitment });
+      if (event.encryptedMemo1) memosToTry.push({ hex: event.encryptedMemo1, ...(event.newCommitment1 ? { commitmentHint: event.newCommitment1 } : {}) });
+      if (event.encryptedMemo2) memosToTry.push({ hex: event.encryptedMemo2, ...(event.newCommitment2 ? { commitmentHint: event.newCommitment2 } : {}) });
+      if (event.encryptedMemo) memosToTry.push({ hex: event.encryptedMemo, ...(event.changeCommitment ? { commitmentHint: event.changeCommitment } : {}) });
 
       for (const { hex } of memosToTry) {
         const decoded = await tryDecryptMemo(hex, privateKey).catch(() => null);
@@ -747,17 +747,10 @@ async function buildNoteWithBlinding(
   const G = babyJub.Base8;
   const Hx = 11991158623290214195992298073348058700477835202184614670606597982489144817024n;
   const Hy = 21045328185755068580775605509882913360526674377439752325760858626206285218496n;
-  const H = [F.e(Hx), F.e(Hy)];
+  const H: [unknown, unknown] = [F.e(Hx), F.e(Hy)];
 
-  function bigintToLE(v: bigint): Uint8Array {
-    const b = new Uint8Array(32);
-    let x = v;
-    for (let i = 0; i < 32; i++) { b[i] = Number(x & 0xffn); x >>= 8n; }
-    return b;
-  }
-
-  const amountG = babyJub.mulPointEscalar(G, bigintToLE(amount));
-  const blindingH = babyJub.mulPointEscalar(H, bigintToLE(blinding));
+  const amountG = babyJub.mulPointEscalar(G, amount);
+  const blindingH = babyJub.mulPointEscalar(H, blinding);
   const pedPoint: [unknown, unknown] = babyJub.addPoint(amountG, blindingH);
 
   const pedersenX = F.toObject(pedPoint[0]) as bigint;

@@ -189,7 +189,7 @@ export class ShroudApiClient {
       response = await fetch(url, {
         method,
         headers,
-        body: body !== undefined ? JSON.stringify(body) : undefined,
+        ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
       });
     } catch (err) {
       throw new NetworkError(
