@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { FuturisticButton } from "@/components/ui/button";
 
 export function Nav() {
@@ -8,7 +9,10 @@ export function Nav() {
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-[#1a1a1a] bg-black/80 backdrop-blur-md">
       <div className="w-full flex items-center justify-between px-6 py-4">
         <div className="flex items-center gap-6">
-          <span className="flex items-center gap-2 text-xl font-bold text-[#acf901] tracking-wide uppercase">
+          <Link
+            href="/"
+            className="flex items-center gap-2 text-xl font-bold text-[#acf901] tracking-wide uppercase"
+          >
             <Image
               src="/schrodingerlabs.png"
               alt="Shroud Network"
@@ -17,7 +21,7 @@ export function Nav() {
               className="rounded-sm"
             />
             Developer Portal
-          </span>
+          </Link>
           <nav className="hidden md:flex gap-1">
             <a
               href="#sdk"
