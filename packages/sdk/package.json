@@ -1,6 +1,6 @@
 {
-  "name": "@shroud/sdk",
-  "version": "0.1.0",
+  "name": "@shroudnetwork/sdk",
+  "version": "0.1.1-beta",
   "description": "Shroud SDK — Privacy-first shielded pool integration for Avalanche",
   "main": "dist/index.cjs",
   "module": "dist/index.mjs",
