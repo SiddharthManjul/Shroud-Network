@@ -1,6 +1,6 @@
 {
   "name": "@shroudnetwork/sdk",
-  "version": "0.1.1-beta",
+  "version": "0.1.3-beta",
   "description": "Shroud SDK — Privacy-first shielded pool integration for Avalanche",
   "main": "dist/index.cjs",
   "module": "dist/index.mjs",
@@ -18,7 +18,8 @@
     "dev": "rollup -c rollup.config.ts --configPlugin typescript -w",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "circomlibjs": "^0.1.7",
