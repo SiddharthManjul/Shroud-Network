@@ -20,7 +20,7 @@ export function HeroSection() {
       />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_40%,rgba(172,249,1,0.06),transparent)]" />
 
-      <div className="relative z-10 max-w-5xl mx-auto px-6 text-center">
+      <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 text-center w-full">
         {/* Badge */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -39,7 +39,7 @@ export function HeroSection() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.1 }}
-          className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight"
+          className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight"
         >
           <span className="text-[#888888]">Add </span>
           <span className="text-[#acf901]">Privacy</span>
@@ -78,7 +78,7 @@ export function HeroSection() {
                 app.ts
               </span>
             </div>
-            <pre className="p-5 text-sm font-mono leading-7 overflow-x-auto">
+            <pre className="p-3 sm:p-5 text-xs sm:text-sm font-mono leading-6 sm:leading-7 overflow-x-auto">
               <code>
                 <span className="text-[#acf901]/70">import</span>
                 <span className="text-[#888888]">{" { "}</span>
