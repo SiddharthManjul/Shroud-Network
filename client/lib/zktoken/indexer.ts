@@ -5,8 +5,11 @@
  * Queries indexed ShieldedPool events instead of scanning RPC in chunks.
  */
 
+/** Server-side: hit Envio directly. Browser: proxy through /api/indexer to avoid CORS. */
 const INDEXER_URL =
-  process.env.NEXT_PUBLIC_INDEXER_URL ?? "http://localhost:8080/v1/graphql";
+  typeof window !== "undefined"
+    ? "/api/indexer"
+    : (process.env.NEXT_PUBLIC_INDEXER_URL ?? "http://localhost:8080/v1/graphql");
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
