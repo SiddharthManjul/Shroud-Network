@@ -1174,8 +1174,8 @@ async function _finalizeTransferNotes(
 
 // ─── Scan chain for incoming notes (memo trial decryption) ────────────────
 
-/** DEPLOY_BLOCK for the current pool contract. */
-const SCAN_DEPLOY_BLOCK = 52396103;
+/** Default deploy block for chain scanning. Updated to match current pool deployment. */
+const SCAN_DEPLOY_BLOCK = 53105800;
 const SCAN_CHUNK_SIZE = 2048;
 
 /**
@@ -1194,8 +1194,10 @@ export async function scanChainForNotes(params: {
   myPublicKey: import("./types").BabyJubPoint;
   tokenAddress: string;
   existingNullifiers?: Set<string>;
+  fromBlock?: number;
 }): Promise<Note[]> {
   const { provider, poolAddress, myPrivateKey, myPublicKey, tokenAddress, existingNullifiers } = params;
+  const startBlock = params.fromBlock ?? SCAN_DEPLOY_BLOCK;
 
   const iface = new Interface(SHIELDED_POOL_ABI);
   const depositTopic = iface.getEvent("Deposit")!.topicHash;
@@ -1206,7 +1208,7 @@ export async function scanChainForNotes(params: {
   const latestBlock = await provider.getBlockNumber();
   const allLogs: { topics: string[]; data: string; blockNumber: number; logIndex?: number }[] = [];
 
-  for (let start = SCAN_DEPLOY_BLOCK; start <= latestBlock; start += SCAN_CHUNK_SIZE) {
+  for (let start = startBlock; start <= latestBlock; start += SCAN_CHUNK_SIZE) {
     const end = Math.min(start + SCAN_CHUNK_SIZE - 1, latestBlock);
     const chunk = await provider.getLogs({
       address: poolAddress,
