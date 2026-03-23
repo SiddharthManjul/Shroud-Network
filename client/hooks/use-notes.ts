@@ -255,8 +255,8 @@ export function useNotes() {
         console.warn("[use-notes] Indexer scan failed:", err);
       }
 
-      // Tier 3: Chain scan — runs if indexer failed OR returned no data and we have no notes
-      if (!indexerWorked && storeRef.current.getAll().length === 0) {
+      // Tier 3: Chain scan — runs whenever indexer failed
+      if (!indexerWorked) {
         console.log("[use-notes] Falling back to chain scan...");
         try {
           const { scanChainForNotes } = await import("@/lib/zktoken/transaction");
