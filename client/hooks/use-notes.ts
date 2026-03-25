@@ -255,8 +255,8 @@ export function useNotes() {
         console.warn("[use-notes] Indexer scan failed:", err);
       }
 
-      // Tier 3: Chain scan — runs whenever indexer failed
-      if (!indexerWorked) {
+      // Tier 3: Chain scan — always run to catch anything relay + indexer missed
+      {
         console.log("[use-notes] Falling back to chain scan...");
         try {
           const { scanChainForNotes } = await import("@/lib/zktoken/transaction");
