@@ -1175,7 +1175,7 @@ async function _finalizeTransferNotes(
 // ─── Scan chain for incoming notes (memo trial decryption) ────────────────
 
 /** Default deploy block for chain scanning. Updated to match current pool deployment. */
-const SCAN_DEPLOY_BLOCK = 53105800;
+const SCAN_DEPLOY_BLOCK = 52460968;
 const SCAN_CHUNK_SIZE = 2048;
 
 /**
