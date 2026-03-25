@@ -196,6 +196,7 @@ export interface EthersProvider {
   getLogs(filter: EthersLogFilter): Promise<EthersLog[]>;
   getBlockNumber(): Promise<number>;
   getNetwork(): Promise<{ chainId: bigint }>;
+  getCode(address: string, blockTag?: number | string): Promise<string>;
 }
 
 export interface EthersTransactionRequest {
