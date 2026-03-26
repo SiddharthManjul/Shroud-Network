@@ -124,6 +124,8 @@ export interface TransferProofParams {
   wasmPath: string;
   /** Path to transfer_final.zkey. */
   zkeyPath: string;
+  /** Asset ID for unified pool circuits. When present, adds asset_id fields to witness. */
+  assetId?: bigint;
 }
 
 /**
@@ -144,6 +146,7 @@ export async function generateTransferProof(
     merklePath,
     wasmPath,
     zkeyPath,
+    assetId,
   } = params;
 
   // ── Validate amounts ────────────────────────────────────────────────────────
@@ -180,17 +183,20 @@ export async function generateTransferProof(
     recipientPedersen,
     secretOut1,
     nullifierPreimageOut1,
-    recipientPublicKey[0]
+    recipientPublicKey[0],
+    assetId
   );
   const changeCommitment = await computeNoteCommitment(
     changePedersen,
     secretOut2,
     nullifierPreimageOut2,
-    senderPublicKey[0]
+    senderPublicKey[0],
+    assetId
   );
 
   // ── Build circuit witness ────────────────────────────────────────────────────
-  const witness = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const witness: Record<string, any> = {
     // Public inputs
     merkle_root: inputNote.leafIndex >= 0 ? merklePath.root.toString() : "0",
     nullifier_hash: inputNote.nullifier.toString(),
@@ -224,6 +230,13 @@ export async function generateTransferProof(
     owner_pk_out_2_y: senderPublicKey[1].toString(),
   };
 
+  // Unified pool: add asset_id fields (all equal — same asset in, same asset out)
+  if (assetId !== undefined) {
+    witness.asset_id = assetId.toString();
+    witness.asset_id_out_1 = assetId.toString();
+    witness.asset_id_out_2 = assetId.toString();
+  }
+
   // ── Generate proof ──────────────────────────────────────────────────────────
   const snarkjs = await getSnarkjs();
   const { proof, publicSignals } = await snarkjs.groth16.fullProve(
@@ -248,6 +261,7 @@ export async function generateTransferProof(
     spent: false,
     tokenAddress: inputNote.tokenAddress,
     createdAtBlock: 0,
+    ...(assetId !== undefined ? { assetId } : {}),
   };
 
   const changeNote: Note = {
@@ -263,6 +277,7 @@ export async function generateTransferProof(
     spent: false,
     tokenAddress: inputNote.tokenAddress,
     createdAtBlock: 0,
+    ...(assetId !== undefined ? { assetId } : {}),
   };
 
   return {
@@ -296,6 +311,8 @@ export interface WithdrawProofParams {
   wasmPath: string;
   /** Path to withdraw_final.zkey. */
   zkeyPath: string;
+  /** Asset ID for unified pool circuits. When present, adds asset_id to witness. */
+  assetId?: bigint;
 }
 
 /**
@@ -317,6 +334,7 @@ export async function generateWithdrawProof(
     merklePath,
     wasmPath,
     zkeyPath,
+    assetId,
   } = params;
 
   // ── Validate ────────────────────────────────────────────────────────────────
@@ -367,7 +385,8 @@ export async function generateWithdrawProof(
     recomputedPedersen,
     inputNote.secret,
     inputNote.nullifierPreimage,
-    inputNote.ownerPublicKey[0]
+    inputNote.ownerPublicKey[0],
+    assetId
   );
   if (recomputedCommitment !== inputNote.noteCommitment) {
     console.error("[withdraw preflight] NOTE COMMITMENT MISMATCH!");
@@ -425,7 +444,8 @@ export async function generateWithdrawProof(
       changePedersen,
       secretOut,
       nullifierPreimageOut,
-      senderPublicKey[0]
+      senderPublicKey[0],
+      assetId
     );
 
     changeNote = {
@@ -441,6 +461,7 @@ export async function generateWithdrawProof(
       spent: false,
       tokenAddress: inputNote.tokenAddress,
       createdAtBlock: 0,
+      ...(assetId !== undefined ? { assetId } : {}),
     };
   } else {
     // Full withdrawal: change_blinding = blinding_in (circuit constraint),
@@ -452,12 +473,14 @@ export async function generateWithdrawProof(
       changePedersen,
       secretOut,
       nullifierPreimageOut,
-      senderPublicKey[0]
+      senderPublicKey[0],
+      assetId
     );
   }
 
   // ── Build witness ───────────────────────────────────────────────────────────
-  const witness = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const witness: Record<string, any> = {
     // Public inputs
     merkle_root: merklePath.root.toString(),
     nullifier_hash: inputNote.nullifier.toString(),
@@ -484,6 +507,12 @@ export async function generateWithdrawProof(
     owner_pk_change_x: senderPublicKey[0].toString(),
   };
 
+  // Unified pool: add asset_id (public) and asset_id_change (private, same value)
+  if (assetId !== undefined) {
+    witness.asset_id = assetId.toString();
+    witness.asset_id_change = assetId.toString();
+  }
+
   // ── Generate proof ──────────────────────────────────────────────────────────
   const snarkjs = await getSnarkjs();
   const { proof, publicSignals } = await snarkjs.groth16.fullProve(
@@ -492,7 +521,7 @@ export async function generateWithdrawProof(
     zkeyPath
   );
 
-  const publicSignalsBigint = (publicSignals as string[]).map((s) => BigInt(s)) as [bigint, bigint, bigint, bigint];
+  const publicSignalsBigint = (publicSignals as string[]).map((s) => BigInt(s));
 
   return {
     proofBytes: encodeProofForContract(proof as Groth16Proof),
@@ -500,4 +529,24 @@ export async function generateWithdrawProof(
     changeNote,
     rawProof: proof as Groth16Proof,
   };
+}
+
+/**
+ * Extract raw proof components (pA, pB, pC) from a Groth16 proof.
+ * Used by the unified pool contract which takes split proof arrays
+ * instead of a single encoded blob.
+ */
+export function getProofComponents(proof: Groth16Proof): {
+  pA: [bigint, bigint];
+  pB: [[bigint, bigint], [bigint, bigint]];
+  pC: [bigint, bigint];
+} {
+  const pA: [bigint, bigint] = [BigInt(proof.pi_a[0]!), BigInt(proof.pi_a[1]!)];
+  // Swap Fq2 order for Solidity precompile
+  const pB: [[bigint, bigint], [bigint, bigint]] = [
+    [BigInt(proof.pi_b[0]![1]!), BigInt(proof.pi_b[0]![0]!)],
+    [BigInt(proof.pi_b[1]![1]!), BigInt(proof.pi_b[1]![0]!)],
+  ];
+  const pC: [bigint, bigint] = [BigInt(proof.pi_c[0]!), BigInt(proof.pi_c[1]!)];
+  return { pA, pB, pC };
 }
