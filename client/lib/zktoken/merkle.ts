@@ -41,14 +41,14 @@ function poseidonHash2(poseidon: any, l: bigint, r: bigint): bigint {
 // ─── Zero value precomputation ────────────────────────────────────────────────
 
 /**
- * Pre-compute all 21 zero values (zero[0]…zero[TREE_DEPTH]).
+ * Pre-compute zero values (zero[0]…zero[depth]).
  * Returns an array where zero[i] is the hash of an empty subtree of depth i.
  */
-async function computeZeros(): Promise<bigint[]> {
+async function computeZeros(depth: number): Promise<bigint[]> {
   const poseidon = await getPoseidon();
-  const zeros: bigint[] = new Array<bigint>(TREE_DEPTH + 1);
+  const zeros: bigint[] = new Array<bigint>(depth + 1);
   zeros[0] = 0n;
-  for (let i = 1; i <= TREE_DEPTH; i++) {
+  for (let i = 1; i <= depth; i++) {
     zeros[i] = poseidonHash2(poseidon, zeros[i - 1]!, zeros[i - 1]!);
   }
   return zeros;
@@ -76,7 +76,7 @@ export class MerkleTreeSync {
   /** Ensure Poseidon is built and zero values are computed. */
   async init(): Promise<void> {
     if (this._initialised) return;
-    this.zeros = await computeZeros();
+    this.zeros = await computeZeros(this.depth);
     this.layers = Array.from({ length: this.depth + 1 }, () => []);
     this._initialised = true;
   }
@@ -206,11 +206,13 @@ export class MerkleTreeSync {
   async syncFromChain(
     provider: EthersProvider,
     poolAddress: string,
-    fromBlock = DEPLOY_BLOCK
+    fromBlock = DEPLOY_BLOCK,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    abi?: readonly any[]
   ): Promise<void> {
     await this.init();
 
-    const iface = new Interface(SHIELDED_POOL_ABI);
+    const iface = new Interface(abi ?? SHIELDED_POOL_ABI);
 
     const depositTopic = iface.getEvent("Deposit")!.topicHash;
     const transferTopic = iface.getEvent("PrivateTransfer")!.topicHash;
@@ -248,8 +250,11 @@ export class MerkleTreeSync {
       } else if (topic === transferTopic) {
         const parsed = iface.parseLog(log);
         if (parsed) {
-          await this.insert(parsed.args["commitment1"] as bigint);
-          await this.insert(parsed.args["commitment2"] as bigint);
+          // Unified pool uses "newCommitment1"/"newCommitment2", V1 uses "commitment1"/"commitment2"
+          const c1 = (parsed.args["newCommitment1"] ?? parsed.args["commitment1"]) as bigint;
+          const c2 = (parsed.args["newCommitment2"] ?? parsed.args["commitment2"]) as bigint;
+          await this.insert(c1);
+          await this.insert(c2);
         }
       } else if (topic === withdrawalTopic) {
         const parsed = iface.parseLog(log);

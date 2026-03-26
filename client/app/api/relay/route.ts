@@ -3,8 +3,11 @@ import { Contract, Interface, JsonRpcProvider, Wallet, formatEther } from "ether
 import { PAYMASTER_ABI } from "@/lib/zktoken/abi/paymaster";
 import { META_TX_RELAYER_ABI } from "@/lib/zktoken/abi/meta-tx-relayer";
 import { SHIELDED_POOL_ABI } from "@/lib/zktoken/abi/shielded-pool";
+import { UNIFIED_SHIELDED_POOL_ABI } from "@/lib/zktoken/abi/unified-shielded-pool";
 import { TRANSFER_VERIFIER_ABI } from "@/lib/zktoken/abi/transfer-verifier";
 import { WITHDRAW_VERIFIER_ABI } from "@/lib/zktoken/abi/withdraw-verifier";
+import { UNIFIED_TRANSFER_VERIFIER_ABI } from "@/lib/zktoken/abi/unified-transfer-verifier";
+import { UNIFIED_WITHDRAW_VERIFIER_ABI } from "@/lib/zktoken/abi/unified-withdraw-verifier";
 
 export const runtime = "nodejs";
 
@@ -296,6 +299,140 @@ async function handleMetaTxRelay(
   }
 }
 
+// ─── Unified pool handler (direct relay, no paymaster) ────────────────────
+
+async function handleUnifiedRelay(
+  body: UnifiedTransferBody | UnifiedWithdrawBody,
+  wallet: Wallet,
+  provider: JsonRpcProvider
+): Promise<NextResponse> {
+  if (!body.poolAddress) {
+    return NextResponse.json({ error: "Missing poolAddress" }, { status: 400 });
+  }
+
+  const poolIface = new Interface(UNIFIED_SHIELDED_POOL_ABI as readonly unknown[]);
+
+  try {
+    let data: string;
+
+    if (body.type === "unified-transfer") {
+      const t = body as UnifiedTransferBody;
+      if (!t.proof_a || !t.proof_b || !t.proof_c || !t.merkleRoot || !t.nullifierHash || !t.newCommitment1 || !t.newCommitment2) {
+        return NextResponse.json({ error: "Missing required unified-transfer fields" }, { status: 400 });
+      }
+
+      // Pre-validate proof
+      const valid = await preValidateUnifiedProof({
+        provider,
+        poolAddress: t.poolAddress,
+        pA: t.proof_a.map(BigInt) as [bigint, bigint],
+        pB: t.proof_b.map(r => r.map(BigInt)) as [[bigint, bigint], [bigint, bigint]],
+        pC: t.proof_c.map(BigInt) as [bigint, bigint],
+        pubSignals: [BigInt(t.merkleRoot), BigInt(t.nullifierHash), BigInt(t.newCommitment1), BigInt(t.newCommitment2)],
+        txType: "transfer",
+      });
+      if (valid === false) {
+        return NextResponse.json({ error: "Proof verification failed — invalid proof." }, { status: 400 });
+      }
+
+      data = poolIface.encodeFunctionData("transfer", [
+        t.proof_a.map(BigInt),
+        t.proof_b.map(r => r.map(BigInt)),
+        t.proof_c.map(BigInt),
+        BigInt(t.merkleRoot),
+        BigInt(t.nullifierHash),
+        BigInt(t.newCommitment1),
+        BigInt(t.newCommitment2),
+        t.encryptedMemo1 ?? "0x",
+        t.encryptedMemo2 ?? "0x",
+      ]);
+    } else {
+      const w = body as UnifiedWithdrawBody;
+      if (!w.proof_a || !w.proof_b || !w.proof_c || !w.merkleRoot || !w.nullifierHash || !w.amount || !w.recipient || !w.token) {
+        return NextResponse.json({ error: "Missing required unified-withdraw fields" }, { status: 400 });
+      }
+
+      // Pre-validate proof
+      const valid = await preValidateUnifiedProof({
+        provider,
+        poolAddress: w.poolAddress,
+        pA: w.proof_a.map(BigInt) as [bigint, bigint],
+        pB: w.proof_b.map(r => r.map(BigInt)) as [[bigint, bigint], [bigint, bigint]],
+        pC: w.proof_c.map(BigInt) as [bigint, bigint],
+        pubSignals: [BigInt(w.merkleRoot), BigInt(w.nullifierHash), BigInt(w.amount), BigInt(w.changeCommitment ?? "0")],
+        txType: "withdraw",
+      });
+      if (valid === false) {
+        return NextResponse.json({ error: "Proof verification failed — invalid proof." }, { status: 400 });
+      }
+
+      data = poolIface.encodeFunctionData("withdraw", [
+        w.proof_a.map(BigInt),
+        w.proof_b.map(r => r.map(BigInt)),
+        w.proof_c.map(BigInt),
+        BigInt(w.merkleRoot),
+        BigInt(w.nullifierHash),
+        BigInt(w.amount),
+        BigInt(w.changeCommitment ?? "0"),
+        w.token,
+        w.recipient,
+        w.encryptedMemo ?? "0x",
+      ]);
+    }
+
+    const tx = await wallet.sendTransaction({ to: body.poolAddress, data });
+    const receipt = await tx.wait();
+
+    return NextResponse.json({
+      txHash: tx.hash,
+      blockNumber: receipt!.blockNumber,
+      status: receipt!.status,
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes("insufficient funds")) {
+      return NextResponse.json({ error: "Relay wallet has insufficient AVAX for gas" }, { status: 503 });
+    }
+    console.error("[relay] Unified pool relay failed:", message);
+    return NextResponse.json({ error: `Transaction failed: ${message}` }, { status: 500 });
+  }
+}
+
+/**
+ * Pre-validate a proof for the unified pool by calling the verifier's verifyProof.
+ */
+async function preValidateUnifiedProof(opts: {
+  provider: JsonRpcProvider;
+  poolAddress: string;
+  pA: [bigint, bigint];
+  pB: [[bigint, bigint], [bigint, bigint]];
+  pC: [bigint, bigint];
+  pubSignals: bigint[];
+  txType: "transfer" | "withdraw";
+}): Promise<boolean | null> {
+  try {
+    const pool = new Contract(opts.poolAddress, UNIFIED_SHIELDED_POOL_ABI as readonly unknown[], opts.provider);
+    const verifierAddr: string =
+      opts.txType === "transfer"
+        ? await pool.transferVerifier()
+        : await pool.withdrawVerifier();
+
+    const verifierAbi =
+      opts.txType === "transfer" ? UNIFIED_TRANSFER_VERIFIER_ABI : UNIFIED_WITHDRAW_VERIFIER_ABI;
+    const verifier = new Contract(verifierAddr, verifierAbi, opts.provider);
+
+    const valid: boolean = await verifier.verifyProof(
+      opts.pA,
+      opts.pB,
+      opts.pC,
+      opts.pubSignals
+    );
+    return valid;
+  } catch {
+    return null;
+  }
+}
+
 // ─── GET /api/relay — Discovery endpoint ─────────────────────────────────────
 
 export async function GET() {
@@ -373,7 +510,36 @@ interface MetaWithdrawBody {
   metaTxRelayerAddress?: string;
 }
 
-type RelayBody = TransferBody | WithdrawBody | MetaDepositBody | MetaWithdrawBody;
+interface UnifiedTransferBody {
+  type: "unified-transfer";
+  poolAddress: string;
+  proof_a: [string, string];
+  proof_b: [[string, string], [string, string]];
+  proof_c: [string, string];
+  merkleRoot: string;
+  nullifierHash: string;
+  newCommitment1: string;
+  newCommitment2: string;
+  encryptedMemo1: string;
+  encryptedMemo2: string;
+}
+
+interface UnifiedWithdrawBody {
+  type: "unified-withdraw";
+  poolAddress: string;
+  proof_a: [string, string];
+  proof_b: [[string, string], [string, string]];
+  proof_c: [string, string];
+  merkleRoot: string;
+  nullifierHash: string;
+  amount: string;
+  changeCommitment: string;
+  token: string;
+  recipient: string;
+  encryptedMemo: string;
+}
+
+type RelayBody = TransferBody | WithdrawBody | MetaDepositBody | MetaWithdrawBody | UnifiedTransferBody | UnifiedWithdrawBody;
 
 export async function POST(request: NextRequest) {
   // ── Rate limiting ──────────────────────────────────────────────────────────
@@ -399,7 +565,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const validTypes = ["transfer", "withdraw", "deposit", "meta-withdraw"];
+  const validTypes = ["transfer", "withdraw", "deposit", "meta-withdraw", "unified-transfer", "unified-withdraw"];
   if (!body.type || !validTypes.includes(body.type)) {
     return NextResponse.json(
       { error: `Missing or invalid 'type' field. Must be one of: ${validTypes.join(", ")}.` },
@@ -413,6 +579,11 @@ export async function POST(request: NextRequest) {
   // ── MetaTxRelayer path (deposit / meta-withdraw) ─────────────────────────
   if (body.type === "deposit" || body.type === "meta-withdraw") {
     return handleMetaTxRelay(body as MetaDepositBody | MetaWithdrawBody, wallet, provider);
+  }
+
+  // ── Unified pool path (unified-transfer / unified-withdraw) ──────────────
+  if (body.type === "unified-transfer" || body.type === "unified-withdraw") {
+    return handleUnifiedRelay(body as UnifiedTransferBody | UnifiedWithdrawBody, wallet, provider);
   }
 
   // ── Paymaster path (transfer / withdraw) ─────────────────────────────────

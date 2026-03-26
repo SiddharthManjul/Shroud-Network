@@ -60,6 +60,8 @@ export interface Note {
   tokenAddress: string;
   /** Block number when this note was created (for re-sync optimisation). */
   createdAtBlock: number;
+  /** Asset ID for unified pool notes: Poseidon(tokenAddress). Absent for V1 notes. */
+  assetId?: bigint;
 }
 
 /** Plaintext note data encoded in the encrypted memo (128 bytes on-chain). */
@@ -113,8 +115,8 @@ export interface TransferProofResult {
 export interface WithdrawProofResult {
   /** ABI-encoded proof bytes (256 bytes) for ShieldedPool.withdraw(). */
   proofBytes: Uint8Array;
-  /** Public signals: [merkleRoot, nullifierHash, amount, changeCommitment]. */
-  publicSignals: [bigint, bigint, bigint, bigint];
+  /** Public signals: 4 for V1, 5 for unified (adds assetId). */
+  publicSignals: bigint[];
   /** Change note (undefined for full withdrawals). */
   changeNote?: Note;
   /** Raw proof for debugging / alternative encoding. */
@@ -346,6 +348,71 @@ export interface RelayResponse {
   blockNumber: number;
   /** Transaction status (1 = success). */
   status: number;
+}
+
+// ─── Pool type / config ──────────────────────────────────────────────────────
+
+/** Discriminator for V1 (single-token) vs unified (multi-asset) pools. */
+export type PoolType = "v1" | "unified";
+
+/** Circuit file paths for proof generation. */
+export interface CircuitPaths {
+  transferWasm: string;
+  transferZkey: string;
+  withdrawWasm: string;
+  withdrawZkey: string;
+}
+
+/** V1 pool configuration (one pool per ERC20, depth 20). */
+export interface V1PoolConfig {
+  poolType: "v1";
+  treeDepth: 20;
+  circuitPaths: CircuitPaths;
+}
+
+/** Unified pool configuration (multi-asset, depth 24). */
+export interface UnifiedPoolConfig {
+  poolType: "unified";
+  treeDepth: 24;
+  assetId: bigint;
+  tokenAddress: string;
+  circuitPaths: CircuitPaths;
+}
+
+/** Discriminated union for pool configuration. */
+export type PoolConfig = V1PoolConfig | UnifiedPoolConfig;
+
+// ─── Unified pool relay params ───────────────────────────────────────────────
+
+/** Parameters for a relayed unified transfer. */
+export interface RelayUnifiedTransferParams {
+  poolAddress: string;
+  provider: EthersProvider;
+  inputNote: Note;
+  transferAmount: bigint;
+  recipientPublicKey: BabyJubPoint;
+  senderPublicKey: BabyJubPoint;
+  senderPrivateKey: bigint;
+  wasmPath: string;
+  zkeyPath: string;
+  assetId: bigint;
+  relayUrl?: string;
+}
+
+/** Parameters for a relayed unified withdrawal. */
+export interface RelayUnifiedWithdrawParams {
+  poolAddress: string;
+  provider: EthersProvider;
+  inputNote: Note;
+  withdrawAmount: bigint;
+  recipient: string;
+  senderPublicKey: BabyJubPoint;
+  senderPrivateKey: bigint;
+  wasmPath: string;
+  zkeyPath: string;
+  assetId: bigint;
+  tokenAddress: string;
+  relayUrl?: string;
 }
 
 // ─── ABIs ────────────────────────────────────────────────────────────────────

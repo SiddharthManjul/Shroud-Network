@@ -135,6 +135,35 @@ export function DepositForm() {
         return;
       }
 
+      // ── Unified pool deposit path ────────────────────────────────────────
+      if (activeToken?.poolType === "unified") {
+        setStatus("Depositing into unified shielded pool...");
+        const { depositUnified, waitForUnifiedDeposit } = await import("@/lib/zktoken/transaction");
+
+        setStatus("Approve the token transfer in your wallet...");
+        const result = await depositUnified({
+          signer: signer as never,
+          poolAddress: POOL_ADDRESS,
+          tokenAddress: TOKEN_ADDRESS,
+          amount: BigInt(trimmed),
+          ownerPublicKey: kp.publicKey,
+        });
+
+        setStatus(`Deposit submitted: ${result.tx.hash}. Waiting for confirmation...`);
+
+        const finalizedNote = await waitForUnifiedDeposit(
+          result.tx,
+          result.pendingNote,
+          provider! as never,
+          POOL_ADDRESS
+        );
+        saveNote(finalizedNote);
+
+        setStatus(`Deposit confirmed! Leaf #${finalizedNote.leafIndex} — ready to transfer.`);
+        setAmount("");
+        return;
+      }
+
       // ── Direct deposit path (existing flow) ─────────────────────────────
       // If depositing native AVAX into a WAVAX pool, wrap first
       if (isWavaxPool && useNativeAvax) {
