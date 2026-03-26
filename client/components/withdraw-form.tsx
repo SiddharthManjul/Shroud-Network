@@ -11,6 +11,7 @@ import { useToken } from "@/providers/token-provider";
 import { ProofStatus } from "./proof-status";
 import { CustomSelect } from "./custom-select";
 import type { Note } from "@/lib/zktoken/types";
+import { getPoolConfig } from "@/lib/zktoken/pool-config";
 
 const inputClass =
   "w-full rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] px-3 py-2 text-[#acf901] placeholder:text-[#444444] focus:border-[#acf901] focus:outline-none transition-colors duration-200";
