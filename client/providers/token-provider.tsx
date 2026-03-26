@@ -9,8 +9,9 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
-import { JsonRpcProvider } from "ethers";
+import { Contract, JsonRpcProvider } from "ethers";
 import type { PoolInfo } from "@/lib/zktoken/registry";
+import { UNIFIED_SHIELDED_POOL_ABI } from "@/lib/zktoken/abi/unified-shielded-pool";
 
 const STORAGE_KEY = "zktoken_active_token";
 
@@ -47,6 +48,8 @@ export function TokenProvider({ children }: { children: ReactNode }) {
   const registryAddress =
     process.env.NEXT_PUBLIC_POOL_REGISTRY_ADDRESS ?? "";
   const rpcUrl = process.env.NEXT_PUBLIC_RPC_URL ?? "https://api.avax-test.network/ext/bc/C/rpc";
+  const unifiedPoolAddress =
+    process.env.NEXT_PUBLIC_UNIFIED_SHIELDED_POOL_ADDRESS ?? "";
 
   // Stable read-only provider for registry queries (no wallet needed)
   const readProviderRef = useRef<JsonRpcProvider | null>(null);
@@ -79,6 +82,44 @@ export function TokenProvider({ children }: { children: ReactNode }) {
     try {
       const { fetchAllPools } = await import("@/lib/zktoken/registry");
       const pools = await fetchAllPools(registryAddress, readProviderRef.current!);
+
+      // Mark V1 pools explicitly
+      for (const p of pools) {
+        if (!p.poolType) p.poolType = "v1";
+      }
+
+      // Query unified pool for whitelisted tokens and add unified entries
+      if (unifiedPoolAddress) {
+        try {
+          const unifiedPool = new Contract(
+            unifiedPoolAddress,
+            UNIFIED_SHIELDED_POOL_ABI as readonly unknown[],
+            readProviderRef.current!
+          );
+          const tokenCount = Number(await unifiedPool.getAllowedTokenCount());
+          for (let i = 0; i < tokenCount; i++) {
+            const tokenAddr: string = await unifiedPool.getAllowedToken(i);
+            const assetId: bigint = await unifiedPool.getAssetId(tokenAddr);
+            // Find matching V1 pool for symbol/decimals info
+            const v1Match = pools.find(
+              (p) => p.token.toLowerCase() === tokenAddr.toLowerCase()
+            );
+            pools.push({
+              pool: unifiedPoolAddress,
+              paymaster: "", // No paymaster for unified pool (direct relay)
+              token: tokenAddr,
+              symbol: v1Match ? `${v1Match.symbol} (Unified)` : "Token (Unified)",
+              decimals: v1Match?.decimals ?? 18,
+              createdAt: 0,
+              poolType: "unified",
+              assetId,
+            });
+          }
+        } catch (err) {
+          console.warn("[TokenProvider] Failed to query unified pool:", err);
+        }
+      }
+
       setTokens(pools);
 
       if (pools.length > 0) {
