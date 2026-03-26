@@ -10,6 +10,7 @@ import { useToken } from "@/providers/token-provider";
 import { ProofStatus } from "./proof-status";
 import { CustomSelect } from "./custom-select";
 import type { Note } from "@/lib/zktoken/types";
+import { getPoolConfig } from "@/lib/zktoken/pool-config";
 
 function ClipboardIcon({ className }: { className?: string }) {
   return (
@@ -97,7 +98,7 @@ export function TransferForm() {
       }
 
       setStatus("Syncing Merkle tree...");
-      const { relayTransfer } = await import("@/lib/zktoken/transaction");
+      const { relayTransfer, relayTransferUnified } = await import("@/lib/zktoken/transaction");
       const {
         createTransferPendingTx,
         updatePendingTx,
@@ -109,21 +110,40 @@ export function TransferForm() {
       const pendingId = createTransferPendingTx(selectedNote, POOL_ADDRESS);
 
       setStatus("Generating ZK proof (this may take a moment)...");
+      const poolConfig = activeToken ? getPoolConfig(activeToken) : null;
+
       let result;
       try {
         const rpcProvider = new JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL);
-        result = await relayTransfer({
-          provider: rpcProvider as never,
-          poolAddress: POOL_ADDRESS,
-          inputNote: selectedNote,
-          transferAmount,
-          recipientPublicKey,
-          senderPublicKey: kp.publicKey,
-          senderPrivateKey: kp.privateKey,
-          wasmPath: "/circuits/transfer.wasm",
-          zkeyPath: "/circuits/transfer_final.zkey",
-          paymasterAddress: activeToken?.paymaster,
-        });
+
+        if (poolConfig?.poolType === "unified") {
+          result = await relayTransferUnified({
+            provider: rpcProvider as never,
+            poolAddress: POOL_ADDRESS,
+            inputNote: selectedNote,
+            transferAmount,
+            recipientPublicKey,
+            senderPublicKey: kp.publicKey,
+            senderPrivateKey: kp.privateKey,
+            wasmPath: poolConfig.circuitPaths.transferWasm,
+            zkeyPath: poolConfig.circuitPaths.transferZkey,
+            assetId: poolConfig.assetId,
+          });
+        } else {
+          const paths = poolConfig?.circuitPaths ?? { transferWasm: "/circuits/transfer.wasm", transferZkey: "/circuits/transfer_final.zkey" };
+          result = await relayTransfer({
+            provider: rpcProvider as never,
+            poolAddress: POOL_ADDRESS,
+            inputNote: selectedNote,
+            transferAmount,
+            recipientPublicKey,
+            senderPublicKey: kp.publicKey,
+            senderPrivateKey: kp.privateKey,
+            wasmPath: paths.transferWasm,
+            zkeyPath: paths.transferZkey,
+            paymasterAddress: activeToken?.paymaster,
+          });
+        }
       } catch (relayErr) {
         removePendingTx(pendingId);
         throw relayErr;
