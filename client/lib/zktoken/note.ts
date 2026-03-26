@@ -81,22 +81,38 @@ export async function computePedersenCommitment(
 
 /**
  * Compute the note commitment (Merkle leaf value).
- *   noteCommitment = Poseidon([ped.x, ped.y, secret, nullifierPreimage, ownerPk.x])
+ *
+ * V1 (5 inputs):       Poseidon([ped.x, ped.y, secret, nullifierPreimage, ownerPk.x])
+ * Unified (6 inputs):  Poseidon([ped.x, ped.y, secret, nullifierPreimage, ownerPk.x, assetId])
  */
 export async function computeNoteCommitment(
   pedersenCommitment: BabyJubPoint,
   secret: bigint,
   nullifierPreimage: bigint,
-  ownerPublicKeyX: bigint
+  ownerPublicKeyX: bigint,
+  assetId?: bigint
 ): Promise<bigint> {
   const poseidon = await getPoseidon();
-  return poseidonHash(poseidon, [
+  const inputs = [
     pedersenCommitment[0],
     pedersenCommitment[1],
     secret,
     nullifierPreimage,
     ownerPublicKeyX,
-  ]);
+  ];
+  if (assetId !== undefined) {
+    inputs.push(assetId);
+  }
+  return poseidonHash(poseidon, inputs);
+}
+
+/**
+ * Compute the asset ID for a token address in the unified pool.
+ *   assetId = Poseidon([BigInt(tokenAddress)])
+ */
+export async function computeAssetId(tokenAddress: string): Promise<bigint> {
+  const poseidon = await getPoseidon();
+  return poseidonHash(poseidon, [BigInt(tokenAddress)]);
 }
 
 /**
@@ -131,7 +147,8 @@ export async function createNote(
   amount: bigint,
   ownerPublicKey: BabyJubPoint,
   tokenAddress: string,
-  createdAtBlock = 0
+  createdAtBlock = 0,
+  assetId?: bigint
 ): Promise<Note> {
   if (amount <= 0n || amount >= 2n ** 64n) {
     throw new Error(`createNote: amount ${amount} out of uint64 range`);
@@ -146,7 +163,8 @@ export async function createNote(
     pedersenCommitment,
     secret,
     nullifierPreimage,
-    ownerPublicKey[0]
+    ownerPublicKey[0],
+    assetId
   );
 
   return {
@@ -162,6 +180,7 @@ export async function createNote(
     spent: false,
     tokenAddress: tokenAddress.toLowerCase(),
     createdAtBlock,
+    ...(assetId !== undefined ? { assetId } : {}),
   };
 }
 
@@ -192,7 +211,8 @@ export async function noteFromMemoData(
   ownerPublicKey: BabyJubPoint,
   tokenAddress: string,
   leafIndex: number,
-  createdAtBlock: number
+  createdAtBlock: number,
+  assetId?: bigint
 ): Promise<Note> {
   const pedersenCommitment = await computePedersenCommitment(
     memoData.amount,
@@ -202,7 +222,8 @@ export async function noteFromMemoData(
     pedersenCommitment,
     memoData.secret,
     memoData.nullifierPreimage,
-    ownerPublicKey[0]
+    ownerPublicKey[0],
+    assetId
   );
   const nullifier = await computeNullifier(
     memoData.nullifierPreimage,
@@ -223,6 +244,7 @@ export async function noteFromMemoData(
     spent: false,
     tokenAddress: tokenAddress.toLowerCase(),
     createdAtBlock,
+    ...(assetId !== undefined ? { assetId } : {}),
   };
 }
 
@@ -230,7 +252,8 @@ export async function noteFromMemoData(
 
 /** Serialise a Note to a JSON string (bigint → hex string). */
 export function encodeNote(note: Note): string {
-  return JSON.stringify({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const obj: any = {
     amount: "0x" + note.amount.toString(16),
     blinding: "0x" + note.blinding.toString(16),
     secret: "0x" + note.secret.toString(16),
@@ -249,14 +272,18 @@ export function encodeNote(note: Note): string {
     spent: note.spent,
     tokenAddress: note.tokenAddress,
     createdAtBlock: note.createdAtBlock,
-  });
+  };
+  if (note.assetId !== undefined) {
+    obj.assetId = "0x" + note.assetId.toString(16);
+  }
+  return JSON.stringify(obj);
 }
 
 /** Deserialise a Note from a JSON string. */
 export function decodeNote(json: string): Note {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const d = JSON.parse(json) as any;
-  return {
+  const note: Note = {
     amount: BigInt(d.amount),
     blinding: BigInt(d.blinding),
     secret: BigInt(d.secret),
@@ -273,6 +300,10 @@ export function decodeNote(json: string): Note {
     tokenAddress: d.tokenAddress as string,
     createdAtBlock: d.createdAtBlock as number,
   };
+  if (d.assetId !== undefined) {
+    note.assetId = BigInt(d.assetId);
+  }
+  return note;
 }
 
 // ─── NoteStore ────────────────────────────────────────────────────────────────
