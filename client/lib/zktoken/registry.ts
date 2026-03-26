@@ -15,6 +15,10 @@ export interface PoolInfo {
   symbol: string;
   decimals: number;
   createdAt: number;
+  /** Pool type: "v1" for single-token pools, "unified" for the multi-asset pool. */
+  poolType?: "v1" | "unified";
+  /** Asset ID for unified pool entries (Poseidon(tokenAddress)). */
+  assetId?: bigint;
 }
 
 /**
