@@ -23,6 +23,8 @@ import {
   type RelayWithdrawParams,
   type RelayDepositParams,
   type RelayMetaWithdrawParams,
+  type RelayUnifiedTransferParams,
+  type RelayUnifiedWithdrawParams,
   type RelayResponse,
   type EthersTransactionResponse,
   type EthersTransactionRequest,
@@ -30,12 +32,14 @@ import {
   type Note,
 } from "./types";
 import { SHIELDED_POOL_ABI } from "./abi/shielded-pool";
+import { UNIFIED_SHIELDED_POOL_ABI } from "./abi/unified-shielded-pool";
 import { TEST_TOKEN_ABI } from "./abi/test-token";
-import { createNote, finaliseNote } from "./note";
+import { createNote, finaliseNote, computeAssetId } from "./note";
 import { MerkleTreeSync } from "./merkle";
 import {
   generateTransferProof,
   generateWithdrawProof,
+  getProofComponents,
 } from "./prover";
 import { encryptMemo, decryptMemo, type MemoEvent } from "./encryption";
 import { noteFromMemoData } from "./note";
@@ -1403,6 +1407,449 @@ export async function scanNotesFromIndexer(params: {
       event.blockNumber
     );
 
+    discoveredNotes.push(note);
+  }
+
+  return discoveredNotes;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Unified Shielded Pool (multi-asset, depth 24)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const UNIFIED_TREE_DEPTH = 24;
+
+// ─── Unified Deposit ────────────────────────────────────────────────────────
+
+/**
+ * Deposit ERC20 tokens into the unified shielded pool.
+ *
+ * The unified pool holds ALL tokens in a single Merkle tree.
+ * deposit(token, amount, noteCommitment) — adds token address.
+ * Note commitment uses 6-input Poseidon (includes assetId).
+ */
+export async function depositUnified(params: {
+  signer: EthersSigner;
+  poolAddress: string;
+  tokenAddress: string;
+  amount: bigint;
+  ownerPublicKey: import("./types").BabyJubPoint;
+}): Promise<{ tx: EthersTransactionResponse; pendingNote: Note }> {
+  const { signer, poolAddress, tokenAddress, amount, ownerPublicKey } = params;
+
+  if (amount <= 0n) throw new Error("depositUnified: amount must be > 0");
+  if (!signer.provider) throw new Error("depositUnified: signer has no provider");
+
+  const assetId = await computeAssetId(tokenAddress);
+  const pendingNote = await createNote(amount, ownerPublicKey, tokenAddress, 0, assetId);
+
+  const scaledAmount = amount * 10n ** 18n;
+
+  // Approve token transfer
+  const erc20Iface = new Interface(TEST_TOKEN_ABI);
+  const approveData = erc20Iface.encodeFunctionData("approve", [poolAddress, scaledAmount]);
+  const approveTx = await sendWithGas(signer, { to: tokenAddress, data: approveData });
+  await approveTx.wait();
+
+  // Deposit into unified pool: deposit(token, amount, noteCommitment)
+  const poolIface = new Interface(UNIFIED_SHIELDED_POOL_ABI as readonly unknown[]);
+  const depositData = poolIface.encodeFunctionData("deposit", [
+    tokenAddress,
+    amount,
+    pendingNote.noteCommitment,
+  ]);
+  const tx = await sendWithGas(signer, { to: poolAddress, data: depositData });
+
+  return { tx, pendingNote };
+}
+
+/**
+ * Wait for a unified deposit to confirm and finalise the note.
+ */
+export async function waitForUnifiedDeposit(
+  tx: EthersTransactionResponse,
+  pendingNote: Note,
+  provider: { getLogs: (f: { address?: string; topics?: (string | null | string[])[]; fromBlock?: number | string; toBlock?: number | string }) => Promise<{ topics: string[]; data: string; blockNumber: number; transactionHash: string }[]> },
+  poolAddress: string
+): Promise<Note> {
+  const receipt = await tx.wait();
+  if (receipt.status !== 1) throw new Error("waitForUnifiedDeposit: transaction reverted");
+
+  const poolIface = new Interface(UNIFIED_SHIELDED_POOL_ABI as readonly unknown[]);
+  const depositTopic = poolIface.getEvent("Deposit")!.topicHash;
+
+  // Try receipt logs first
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const receiptLogs: { topics: string[]; data: string }[] = (receipt as any).logs ?? [];
+  for (const log of receiptLogs) {
+    if (log.topics[0]?.toLowerCase() === depositTopic.toLowerCase()) {
+      try {
+        const parsed = poolIface.parseLog(log);
+        if (parsed) {
+          const leafIndex = Number(parsed.args["leafIndex"] as bigint);
+          return finaliseNote({ ...pendingNote, createdAtBlock: receipt.blockNumber }, leafIndex);
+        }
+      } catch { /* continue */ }
+    }
+  }
+
+  // Fallback: getLogs
+  const noteCommitmentHex = "0x" + pendingNote.noteCommitment.toString(16).padStart(64, "0");
+  const logs = await provider.getLogs({
+    address: poolAddress,
+    topics: [depositTopic, noteCommitmentHex],
+    fromBlock: receipt.blockNumber,
+    toBlock: receipt.blockNumber,
+  });
+
+  if (logs.length === 0) {
+    throw new Error("waitForUnifiedDeposit: Deposit event not found");
+  }
+
+  const parsed = poolIface.parseLog(logs[0]);
+  if (!parsed) throw new Error("waitForUnifiedDeposit: failed to parse Deposit event");
+
+  const leafIndex = Number(parsed.args["leafIndex"] as bigint);
+  return finaliseNote({ ...pendingNote, createdAtBlock: receipt.blockNumber }, leafIndex);
+}
+
+// ─── Unified Relayed Transfer ────────────────────────────────────────────────
+
+/**
+ * Execute a private transfer in the unified pool via the relay API.
+ *
+ * Key differences from V1:
+ *  - Tree depth 24 (not 20)
+ *  - assetId in witness
+ *  - Proof sent as split (proof_a, proof_b, proof_c) instead of single blob
+ *  - Relay body type: "unified-transfer"
+ */
+export async function relayTransferUnified(
+  params: RelayUnifiedTransferParams
+): Promise<{
+  relay: RelayResponse;
+  recipientNote: Note;
+  changeNote: Note;
+}> {
+  const {
+    provider,
+    poolAddress,
+    inputNote,
+    transferAmount,
+    recipientPublicKey,
+    senderPublicKey,
+    senderPrivateKey,
+    wasmPath,
+    zkeyPath,
+    assetId,
+    relayUrl = "/api/relay",
+  } = params;
+
+  if (inputNote.spent) throw new Error("relayTransferUnified: inputNote is already spent");
+  if (inputNote.leafIndex < 0) throw new Error("relayTransferUnified: inputNote not yet finalised");
+  if (transferAmount <= 0n || transferAmount > inputNote.amount) {
+    throw new Error(`relayTransferUnified: invalid transferAmount ${transferAmount}`);
+  }
+
+  // 1. Sync Merkle tree (depth 24, unified ABI)
+  const tree = new MerkleTreeSync(UNIFIED_TREE_DEPTH);
+  await tree.syncFromChain(provider, poolAddress, SCAN_DEPLOY_BLOCK, UNIFIED_SHIELDED_POOL_ABI as readonly unknown[]);
+  const merklePath = await tree.getMerklePath(inputNote.leafIndex);
+
+  // 2. Generate proof with assetId
+  const proofResult = await generateTransferProof({
+    inputNote,
+    transferAmount,
+    recipientPublicKey,
+    senderPublicKey,
+    senderPrivateKey,
+    merklePath,
+    wasmPath,
+    zkeyPath,
+    assetId,
+  });
+
+  // 3. Encrypt memos
+  const encryptedMemo1 = await encryptMemo(
+    { amount: proofResult.recipientNote.amount, blinding: proofResult.recipientNote.blinding, secret: proofResult.recipientNote.secret, nullifierPreimage: proofResult.recipientNote.nullifierPreimage },
+    recipientPublicKey
+  );
+  const encryptedMemo2 = await encryptMemo(
+    { amount: proofResult.changeNote.amount, blinding: proofResult.changeNote.blinding, secret: proofResult.changeNote.secret, nullifierPreimage: proofResult.changeNote.nullifierPreimage },
+    senderPublicKey
+  );
+
+  const [merkleRoot, nullifierHash, newCommitment1, newCommitment2] = proofResult.publicSignals;
+  const { pA, pB, pC } = getProofComponents(proofResult.rawProof);
+
+  // 4. POST to relay API with unified format
+  const body = {
+    type: "unified-transfer" as const,
+    poolAddress,
+    proof_a: [pA[0].toString(), pA[1].toString()],
+    proof_b: [[pB[0][0].toString(), pB[0][1].toString()], [pB[1][0].toString(), pB[1][1].toString()]],
+    proof_c: [pC[0].toString(), pC[1].toString()],
+    merkleRoot: merkleRoot.toString(),
+    nullifierHash: nullifierHash.toString(),
+    newCommitment1: newCommitment1.toString(),
+    newCommitment2: newCommitment2.toString(),
+    encryptedMemo1: "0x" + bytesToHex(encryptedMemo1),
+    encryptedMemo2: "0x" + bytesToHex(encryptedMemo2),
+  };
+
+  const res = await fetch(relayUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`relayTransferUnified: relay returned ${res.status}: ${errText}`);
+  }
+
+  const relay: RelayResponse = await res.json();
+
+  // 5. Finalize notes
+  const postTree = new MerkleTreeSync(UNIFIED_TREE_DEPTH);
+  await postTree.syncFromChain(provider, poolAddress, SCAN_DEPLOY_BLOCK, UNIFIED_SHIELDED_POOL_ABI as readonly unknown[]);
+
+  const recipientIdx = postTree.findLeafIndex(proofResult.recipientNote.noteCommitment);
+  const changeIdx = postTree.findLeafIndex(proofResult.changeNote.noteCommitment);
+
+  const finalRecipient = recipientIdx >= 0
+    ? await finaliseNote({ ...proofResult.recipientNote, createdAtBlock: relay.blockNumber }, recipientIdx)
+    : proofResult.recipientNote;
+  const finalChange = changeIdx >= 0
+    ? await finaliseNote({ ...proofResult.changeNote, createdAtBlock: relay.blockNumber }, changeIdx)
+    : proofResult.changeNote;
+
+  // 6. Post notifications (fire-and-forget)
+  _postTransferNotifications({
+    recipientPubKey: recipientPublicKey,
+    senderPubKey: senderPublicKey,
+    txHash: relay.txHash,
+    blockNumber: relay.blockNumber,
+    recipientNote: finalRecipient,
+    changeNote: finalChange,
+    encryptedMemo1Hex: "0x" + bytesToHex(encryptedMemo1),
+    encryptedMemo2Hex: "0x" + bytesToHex(encryptedMemo2),
+  }).catch(() => {});
+
+  return { relay, recipientNote: finalRecipient, changeNote: finalChange };
+}
+
+// ─── Unified Relayed Withdraw ────────────────────────────────────────────────
+
+/**
+ * Withdraw from the unified pool via the relay API.
+ *
+ * The unified withdraw circuit produces 5 public signals (adds assetId).
+ * The contract's withdraw takes split proof + token address.
+ */
+export async function relayWithdrawUnified(
+  params: RelayUnifiedWithdrawParams
+): Promise<{
+  relay: RelayResponse;
+  changeNote: Note | undefined;
+}> {
+  const {
+    provider,
+    poolAddress,
+    inputNote,
+    withdrawAmount,
+    recipient,
+    senderPublicKey,
+    senderPrivateKey,
+    wasmPath,
+    zkeyPath,
+    assetId,
+    tokenAddress,
+    relayUrl = "/api/relay",
+  } = params;
+
+  if (inputNote.spent) throw new Error("relayWithdrawUnified: inputNote is already spent");
+  if (inputNote.leafIndex < 0) throw new Error("relayWithdrawUnified: inputNote not yet finalised");
+  if (withdrawAmount <= 0n || withdrawAmount > inputNote.amount) {
+    throw new Error(`relayWithdrawUnified: invalid withdrawAmount ${withdrawAmount}`);
+  }
+
+  getAddress(recipient);
+
+  // 1. Sync Merkle tree (depth 24)
+  const tree = new MerkleTreeSync(UNIFIED_TREE_DEPTH);
+  await tree.syncFromChain(provider, poolAddress, SCAN_DEPLOY_BLOCK, UNIFIED_SHIELDED_POOL_ABI as readonly unknown[]);
+
+  const treeLeaves = tree.getLeaves();
+  if (inputNote.leafIndex >= treeLeaves.length) {
+    throw new Error(`relayWithdrawUnified: note leafIndex ${inputNote.leafIndex} beyond tree size ${treeLeaves.length}`);
+  }
+  if (treeLeaves[inputNote.leafIndex] !== inputNote.noteCommitment) {
+    throw new Error(`relayWithdrawUnified: Merkle tree leaf mismatch at index ${inputNote.leafIndex}`);
+  }
+
+  const merklePath = await tree.getMerklePath(inputNote.leafIndex);
+
+  // 2. Generate proof with assetId (5 public signals)
+  const proofResult = await generateWithdrawProof({
+    inputNote,
+    withdrawAmount,
+    recipient,
+    senderPublicKey,
+    senderPrivateKey,
+    merklePath,
+    wasmPath,
+    zkeyPath,
+    assetId,
+  });
+
+  const [merkleRoot, nullifierHash, amount, changeCommitment] = proofResult.publicSignals;
+  const { pA, pB, pC } = getProofComponents(proofResult.rawProof);
+
+  // 3. Encrypt change memo
+  let encryptedMemoHex = "0x";
+  if (proofResult.changeNote) {
+    const encryptedMemo = await encryptMemo(
+      { amount: proofResult.changeNote.amount, blinding: proofResult.changeNote.blinding, secret: proofResult.changeNote.secret, nullifierPreimage: proofResult.changeNote.nullifierPreimage },
+      senderPublicKey
+    );
+    encryptedMemoHex = "0x" + bytesToHex(encryptedMemo);
+  }
+
+  // 4. POST to relay API
+  const body = {
+    type: "unified-withdraw" as const,
+    poolAddress,
+    proof_a: [pA[0].toString(), pA[1].toString()],
+    proof_b: [[pB[0][0].toString(), pB[0][1].toString()], [pB[1][0].toString(), pB[1][1].toString()]],
+    proof_c: [pC[0].toString(), pC[1].toString()],
+    merkleRoot: merkleRoot.toString(),
+    nullifierHash: nullifierHash.toString(),
+    amount: amount.toString(),
+    changeCommitment: changeCommitment.toString(),
+    token: tokenAddress,
+    recipient,
+    encryptedMemo: encryptedMemoHex,
+  };
+
+  const res = await fetch(relayUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`relayWithdrawUnified: relay returned ${res.status}: ${errText}`);
+  }
+
+  const relay: RelayResponse = await res.json();
+
+  // 5. Finalize change note
+  let finalizedChange = proofResult.changeNote;
+  if (finalizedChange) {
+    const postTree = new MerkleTreeSync(UNIFIED_TREE_DEPTH);
+    await postTree.syncFromChain(provider, poolAddress, SCAN_DEPLOY_BLOCK, UNIFIED_SHIELDED_POOL_ABI as readonly unknown[]);
+    const changeIdx = postTree.findLeafIndex(finalizedChange.noteCommitment);
+    if (changeIdx >= 0) {
+      finalizedChange = await finaliseNote(
+        { ...finalizedChange, createdAtBlock: relay.blockNumber },
+        changeIdx
+      );
+    }
+  }
+
+  return { relay, changeNote: finalizedChange };
+}
+
+// ─── Unified Chain Scanning ──────────────────────────────────────────────────
+
+/**
+ * Scan the unified pool's on-chain events for notes addressed to the given key.
+ *
+ * Similar to scanChainForNotes but:
+ *  - Uses UNIFIED_SHIELDED_POOL_ABI for event parsing
+ *  - Passes assetId to noteFromMemoData for correct 6-input commitment
+ *  - Handles unified event field names (newCommitment1/newCommitment2)
+ */
+export async function scanChainForNotesUnified(params: {
+  provider: import("./types").EthersProvider;
+  poolAddress: string;
+  myPrivateKey: bigint;
+  myPublicKey: import("./types").BabyJubPoint;
+  tokenAddress: string;
+  assetId: bigint;
+  existingNullifiers?: Set<string>;
+  fromBlock?: number;
+}): Promise<Note[]> {
+  const { provider, poolAddress, myPrivateKey, myPublicKey, tokenAddress, assetId, existingNullifiers } = params;
+  const startBlock = params.fromBlock ?? SCAN_DEPLOY_BLOCK;
+
+  const iface = new Interface(UNIFIED_SHIELDED_POOL_ABI as readonly unknown[]);
+  const depositTopic = iface.getEvent("Deposit")!.topicHash;
+  const transferTopic = iface.getEvent("PrivateTransfer")!.topicHash;
+  const withdrawalTopic = iface.getEvent("Withdrawal")!.topicHash;
+  const topics = [[depositTopic, transferTopic, withdrawalTopic]];
+
+  const latestBlock = await provider.getBlockNumber();
+  const allLogs: { topics: string[]; data: string; blockNumber: number; logIndex?: number }[] = [];
+
+  for (let start = startBlock; start <= latestBlock; start += SCAN_CHUNK_SIZE) {
+    const end = Math.min(start + SCAN_CHUNK_SIZE - 1, latestBlock);
+    const chunk = await provider.getLogs({ address: poolAddress, topics, fromBlock: start, toBlock: end });
+    allLogs.push(...chunk);
+  }
+
+  allLogs.sort((a, b) => {
+    if (a.blockNumber !== b.blockNumber) return a.blockNumber - b.blockNumber;
+    return (a.logIndex ?? 0) - (b.logIndex ?? 0);
+  });
+
+  let leafIndex = 0;
+  const memoEvents: Array<{ memoBytes: Uint8Array; commitment: bigint; leafIndex: number; blockNumber: number }> = [];
+
+  for (const log of allLogs) {
+    const topic = log.topics[0];
+    if (topic === depositTopic) {
+      leafIndex++;
+    } else if (topic === transferTopic) {
+      const parsed = iface.parseLog(log);
+      if (parsed) {
+        const commitment1 = parsed.args["newCommitment1"] as bigint;
+        const commitment2 = parsed.args["newCommitment2"] as bigint;
+        const memo1Hex = parsed.args["encryptedMemo1"] as string;
+        const memo2Hex = parsed.args["encryptedMemo2"] as string;
+
+        if (memo1Hex && memo1Hex.length > 2) {
+          memoEvents.push({ memoBytes: hexToBytes(memo1Hex.slice(2)), commitment: commitment1, leafIndex, blockNumber: log.blockNumber });
+        }
+        if (memo2Hex && memo2Hex.length > 2) {
+          memoEvents.push({ memoBytes: hexToBytes(memo2Hex.slice(2)), commitment: commitment2, leafIndex: leafIndex + 1, blockNumber: log.blockNumber });
+        }
+        leafIndex += 2;
+      }
+    } else if (topic === withdrawalTopic) {
+      const parsed = iface.parseLog(log);
+      if (parsed) {
+        const changeCommitment = parsed.args["changeCommitment"] as bigint;
+        const memoHex = parsed.args["encryptedMemo"] as string;
+        if (changeCommitment !== 0n) {
+          if (memoHex && memoHex.length > 2) {
+            memoEvents.push({ memoBytes: hexToBytes(memoHex.slice(2)), commitment: changeCommitment, leafIndex, blockNumber: log.blockNumber });
+          }
+          leafIndex++;
+        }
+      }
+    }
+  }
+
+  const discoveredNotes: Note[] = [];
+  for (const event of memoEvents) {
+    const memoData = await decryptMemo(event.memoBytes, myPrivateKey);
+    if (memoData === null) continue;
+
+    const note = await noteFromMemoData(memoData, myPublicKey, tokenAddress, event.leafIndex, event.blockNumber, assetId);
+    if (existingNullifiers?.has(note.nullifier.toString())) continue;
     discoveredNotes.push(note);
   }
 
