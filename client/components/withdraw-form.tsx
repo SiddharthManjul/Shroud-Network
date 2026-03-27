@@ -179,26 +179,45 @@ export function WithdrawForm() {
         return;
       }
 
-      // ── Paymaster relay path (existing flow) ──────────────────────────
-      setStatus("Syncing Merkle tree...");
-      const { relayWithdraw } = await import("@/lib/zktoken/transaction");
+      // ── Unified pool relay path ────────────────────────────────────────
+      const { relayWithdraw, relayWithdrawUnified } = await import("@/lib/zktoken/transaction");
       const rpcProvider = provider ?? new JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL);
+      const poolConfig = activeToken ? getPoolConfig(activeToken) : null;
 
       setStatus("Generating ZK proof (this may take a moment)...");
       let result;
       try {
-        result = await relayWithdraw({
-          provider: rpcProvider as never,
-          poolAddress: POOL_ADDRESS,
-          inputNote: selectedNote,
-          withdrawAmount,
-          recipient,
-          senderPublicKey: kp.publicKey,
-          senderPrivateKey: kp.privateKey,
-          wasmPath: "/circuits/withdraw.wasm",
-          zkeyPath: "/circuits/withdraw_final.zkey",
-          paymasterAddress: activeToken?.paymaster,
-        });
+        if (poolConfig?.poolType === "unified") {
+          result = await relayWithdrawUnified({
+            provider: rpcProvider as never,
+            poolAddress: POOL_ADDRESS,
+            inputNote: selectedNote,
+            withdrawAmount,
+            recipient,
+            senderPublicKey: kp.publicKey,
+            senderPrivateKey: kp.privateKey,
+            wasmPath: poolConfig.circuitPaths.withdrawWasm,
+            zkeyPath: poolConfig.circuitPaths.withdrawZkey,
+            assetId: poolConfig.assetId,
+            tokenAddress: poolConfig.tokenAddress,
+          });
+        } else {
+          // ── Paymaster relay path (V1 / existing flow) ──────────────────
+          setStatus("Syncing Merkle tree...");
+          const paths = poolConfig?.circuitPaths ?? { withdrawWasm: "/circuits/withdraw.wasm", withdrawZkey: "/circuits/withdraw_final.zkey" };
+          result = await relayWithdraw({
+            provider: rpcProvider as never,
+            poolAddress: POOL_ADDRESS,
+            inputNote: selectedNote,
+            withdrawAmount,
+            recipient,
+            senderPublicKey: kp.publicKey,
+            senderPrivateKey: kp.privateKey,
+            wasmPath: paths.withdrawWasm,
+            zkeyPath: paths.withdrawZkey,
+            paymasterAddress: activeToken?.paymaster,
+          });
+        }
       } catch (relayErr) {
         removePendingTx(pendingId);
         throw relayErr;

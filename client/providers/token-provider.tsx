@@ -83,37 +83,56 @@ export function TokenProvider({ children }: { children: ReactNode }) {
       const { fetchAllPools } = await import("@/lib/zktoken/registry");
       const pools = await fetchAllPools(registryAddress, readProviderRef.current!);
 
-      // Mark V1 pools explicitly
+      // Mark all fetched pools as V1 initially
       for (const p of pools) {
         if (!p.poolType) p.poolType = "v1";
       }
 
-      // Query unified pool for whitelisted tokens and add unified entries
+      // Upgrade tokens that are explicitly whitelisted in the unified pool.
+      // Only tokens returned by getAllowedToken() can be deposited — getAssetId()
+      // is a pure computation that succeeds for any address, but deposit() will
+      // revert for non-whitelisted tokens.
       if (unifiedPoolAddress) {
         try {
           const unifiedPool = new Contract(
             unifiedPoolAddress,
-            UNIFIED_SHIELDED_POOL_ABI as readonly unknown[],
+            UNIFIED_SHIELDED_POOL_ABI as never,
             readProviderRef.current!
           );
+          const erc20Abi = ["function decimals() view returns (uint8)"];
           const tokenCount = Number(await unifiedPool.getAllowedTokenCount());
+
           for (let i = 0; i < tokenCount; i++) {
             const tokenAddr: string = await unifiedPool.getAllowedToken(i);
             const assetId: bigint = await unifiedPool.getAssetId(tokenAddr);
-            // Find matching V1 pool for symbol/decimals info
-            const v1Match = pools.find(
+            const existing = pools.find(
               (p) => p.token.toLowerCase() === tokenAddr.toLowerCase()
             );
-            pools.push({
-              pool: unifiedPoolAddress,
-              paymaster: "", // No paymaster for unified pool (direct relay)
-              token: tokenAddr,
-              symbol: v1Match ? `${v1Match.symbol} (Unified)` : "Token (Unified)",
-              decimals: v1Match?.decimals ?? 18,
-              createdAt: 0,
-              poolType: "unified",
-              assetId,
-            });
+            if (existing) {
+              // Upgrade the matching V1 entry to use the unified pool
+              existing.pool = unifiedPoolAddress;
+              existing.poolType = "unified";
+              existing.assetId = assetId;
+              existing.paymaster = "";
+            } else {
+              // Token is only in the unified pool — add a new entry
+              let decimals = 18;
+              try {
+                const erc20 = new Contract(tokenAddr, erc20Abi, readProviderRef.current!);
+                decimals = await erc20.decimals().then(Number);
+              } catch { /* use default */ }
+
+              pools.push({
+                pool: unifiedPoolAddress,
+                paymaster: "",
+                token: tokenAddr,
+                symbol: "Unified",
+                decimals,
+                createdAt: 0,
+                poolType: "unified",
+                assetId,
+              });
+            }
           }
         } catch (err) {
           console.warn("[TokenProvider] Failed to query unified pool:", err);
