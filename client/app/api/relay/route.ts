@@ -310,7 +310,7 @@ async function handleUnifiedRelay(
     return NextResponse.json({ error: "Missing poolAddress" }, { status: 400 });
   }
 
-  const poolIface = new Interface(UNIFIED_SHIELDED_POOL_ABI as readonly unknown[]);
+  const poolIface = new Interface(UNIFIED_SHIELDED_POOL_ABI as never);
 
   try {
     let data: string;
@@ -411,7 +411,7 @@ async function preValidateUnifiedProof(opts: {
   txType: "transfer" | "withdraw";
 }): Promise<boolean | null> {
   try {
-    const pool = new Contract(opts.poolAddress, UNIFIED_SHIELDED_POOL_ABI as readonly unknown[], opts.provider);
+    const pool = new Contract(opts.poolAddress, UNIFIED_SHIELDED_POOL_ABI as never, opts.provider);
     const verifierAddr: string =
       opts.txType === "transfer"
         ? await pool.transferVerifier()
