@@ -22,10 +22,17 @@ export type {
   WithdrawParams,
   RelayTransferParams,
   RelayWithdrawParams,
+  RelayUnifiedTransferParams,
+  RelayUnifiedWithdrawParams,
   RelayResponse,
   EthersSigner,
   EthersProvider,
   EthersTransactionResponse,
+  PoolType,
+  PoolConfig,
+  V1PoolConfig,
+  UnifiedPoolConfig,
+  CircuitPaths,
 } from "./types";
 export { SHIELDED_POOL_ABI } from "./abi/shielded-pool";
 export { TEST_TOKEN_ABI } from "./abi/test-token";
@@ -44,6 +51,7 @@ export {
   computePedersenCommitment,
   computeNoteCommitment,
   computeNullifier,
+  computeAssetId,
   encodeNote,
   decodeNote,
   NoteStore,
@@ -66,8 +74,12 @@ export {
   generateTransferProof,
   generateWithdrawProof,
   encodeProofForContract,
+  getProofComponents,
 } from "./prover";
 export type { TransferProofParams, WithdrawProofParams } from "./prover";
+
+// Pool config
+export { getPoolConfig } from "./pool-config";
 
 // TransactionBuilder
 export {
@@ -80,6 +92,12 @@ export {
   scanChainForNotes,
   scanNotesFromRelay,
   scanNotesFromIndexer,
+  // Unified pool
+  depositUnified,
+  waitForUnifiedDeposit,
+  relayTransferUnified,
+  relayWithdrawUnified,
+  scanChainForNotesUnified,
 } from "./transaction";
 
 // Indexer (Envio HyperIndex GraphQL client)
