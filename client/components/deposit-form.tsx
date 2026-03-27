@@ -1,14 +1,15 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
-import { useState, useMemo } from "react";
-import { Contract, parseEther } from "ethers";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { Contract, parseEther, JsonRpcProvider, formatUnits } from "ethers";
 import { useWallet } from "@/hooks/use-wallet";
 import { useZkToken } from "@/hooks/use-zktoken";
 import { useNotes } from "@/hooks/use-notes";
 import { useShieldedKey } from "@/hooks/use-shielded-key";
 import { useToken } from "@/providers/token-provider";
 import { getWavaxAddress, WAVAX_ABI } from "@/lib/zktoken/abi/wavax";
+import { CustomSelect } from "./custom-select";
 
 const inputClass =
   "w-full rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] px-3 py-2 text-[#acf901] placeholder:text-[#444444] focus:border-[#acf901] focus:outline-none transition-colors duration-200";
@@ -34,17 +35,99 @@ function computeFee(amount: bigint): bigint {
   return fee < 1n ? 1n : fee;
 }
 
+
 export function DepositForm() {
   const { ready } = useZkToken();
   const { address, signer, provider, connect: connectWallet, connecting: walletConnecting, disconnect: disconnectWallet } = useWallet();
   const { notes, saveNote } = useNotes();
   const { keypair, deriveKey } = useShieldedKey();
-  const { activeToken } = useToken();
+  const { tokens, activeToken, setActiveToken } = useToken();
 
-  const POOL_ADDRESS = activeToken?.pool ?? "";
-  const TOKEN_ADDRESS = activeToken?.token ?? "";
-  const tokenSymbol = activeToken?.symbol ?? "Token";
+  // ── Pool / token selection (local — token switches within a pool don't affect navbar) ──
+  // Distinct pools derived from the tokens list
+  const distinctPools = useMemo(() => {
+    const seen = new Map<string, { pool: string; poolType: string; label: string }>();
+    for (const t of tokens) {
+      const key = t.pool.toLowerCase();
+      if (!seen.has(key)) {
+        seen.set(key, {
+          pool: t.pool,
+          poolType: t.poolType ?? "v1",
+          label: t.poolType === "unified" ? "Unified Pool" : t.symbol,
+        });
+      }
+    }
+    return [...seen.values()];
+  }, [tokens]);
+
+  // Selected pool address (local state)
+  const [selectedPoolAddr, setSelectedPoolAddr] = useState<string>(
+    () => activeToken?.pool.toLowerCase() ?? ""
+  );
+
+  // Tokens available in the selected pool
+  const poolTokens = useMemo(
+    () => tokens.filter((t) => t.pool.toLowerCase() === selectedPoolAddr),
+    [tokens, selectedPoolAddr]
+  );
+
+  // Selected token within the pool (local state — doesn't touch global activeToken)
+  const [selectedToken, setSelectedToken] = useState(() => activeToken);
+
+  // Keep local selection in sync when the global pool changes (e.g. via navbar)
+  useEffect(() => {
+    if (!activeToken) return;
+    const poolAddr = activeToken.pool.toLowerCase();
+    setSelectedPoolAddr(poolAddr);
+    setSelectedToken(activeToken);
+  }, [activeToken?.pool]);
+
+  // When pool changes, update global activeToken (so notes are saved under the right key)
+  // and default the token to the first one in that pool.
+  const handlePoolChange = useCallback((poolAddr: string) => {
+    setSelectedPoolAddr(poolAddr);
+    const first = tokens.find((t) => t.pool.toLowerCase() === poolAddr);
+    if (first) {
+      setSelectedToken(first);
+      setActiveToken(first);
+    }
+  }, [tokens, setActiveToken]);
+
+  const POOL_ADDRESS = selectedToken?.pool ?? "";
+  const TOKEN_ADDRESS = selectedToken?.token ?? "";
+  const tokenSymbol = selectedToken?.symbol ?? "Token";
   const [amount, setAmount] = useState("");
+
+  // Wallet balances keyed by token address (lowercase)
+  const [walletBalances, setWalletBalances] = useState<Record<string, string>>({});
+
+  const fetchWalletBalances = useCallback(async () => {
+    if (!address) return;
+    const rpcProvider = provider ?? new JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL);
+    // Deduplicate token addresses
+    const uniqueTokens = [...new Map(tokens.map((t) => [t.token.toLowerCase(), t])).values()];
+    const { TEST_TOKEN_ABI } = await import("@/lib/zktoken/abi/test-token");
+    const results: Record<string, string> = {};
+    await Promise.all(
+      uniqueTokens.map(async (t) => {
+        try {
+          const erc20 = new Contract(t.token, TEST_TOKEN_ABI, rpcProvider as never);
+          const [balance, decimals] = await Promise.all([
+            erc20.balanceOf(address),
+            erc20.decimals(),
+          ]);
+          results[t.token.toLowerCase()] = formatUnits(balance as bigint, Number(decimals));
+        } catch {
+          // ignore
+        }
+      })
+    );
+    setWalletBalances(results);
+  }, [address, provider, tokens]);
+
+  useEffect(() => {
+    fetchWalletBalances();
+  }, [fetchWalletBalances]);
   const [status, setStatus] = useState<string | null>(null);
   const [useRelay, setUseRelay] = useState(false);
 
@@ -136,7 +219,7 @@ export function DepositForm() {
       }
 
       // ── Unified pool deposit path ────────────────────────────────────────
-      if (activeToken?.poolType === "unified") {
+      if (selectedToken?.poolType === "unified") {
         setStatus("Depositing into unified shielded pool...");
         const { depositUnified, waitForUnifiedDeposit } = await import("@/lib/zktoken/transaction");
 
@@ -169,7 +252,7 @@ export function DepositForm() {
       if (isWavaxPool && useNativeAvax) {
         setStatus("Wrapping native AVAX to WAVAX...");
         const wavaxContract = new Contract(TOKEN_ADDRESS, WAVAX_ABI, signer);
-        const amountScale = activeToken?.decimals ?? 18;
+        const amountScale = selectedToken?.decimals ?? 18;
         const wrapValue = BigInt(trimmed) * (10n ** BigInt(amountScale));
         const wrapTx = await wavaxContract.deposit({ value: wrapValue });
         await wrapTx.wait();
@@ -277,6 +360,49 @@ export function DepositForm() {
           </div>
         )}
       </div>
+
+      {/* Pool selector */}
+      {distinctPools.length > 0 && (
+        <div>
+          <label className="block text-sm font-medium text-[#888888] mb-1">
+            Pool
+          </label>
+          <CustomSelect
+            value={selectedPoolAddr}
+            options={distinctPools.map((p) => ({
+              value: p.pool.toLowerCase(),
+              label: p.label,
+            }))}
+            onChange={handlePoolChange}
+            placeholder="Select pool..."
+          />
+        </div>
+      )}
+
+      {/* Token selector — shown when the selected pool supports multiple tokens */}
+      {poolTokens.length > 1 && (
+        <div>
+          <label className="block text-sm font-medium text-[#888888] mb-1">
+            Token
+          </label>
+          <CustomSelect
+            value={selectedToken?.token.toLowerCase() ?? ""}
+            options={poolTokens.map((t) => {
+              const bal = walletBalances[t.token.toLowerCase()];
+              const balStr = bal !== undefined
+                ? ` — ${Number(bal).toLocaleString(undefined, { maximumFractionDigits: 4 })}`
+                : "";
+              return { value: t.token.toLowerCase(), label: `${t.symbol}${balStr}` };
+            })}
+            onChange={(val) => {
+              const t = poolTokens.find((t) => t.token.toLowerCase() === val);
+              if (t) setSelectedToken(t);
+              // Intentionally not calling setActiveToken — pool stays fixed in navbar
+            }}
+            placeholder="Select token..."
+          />
+        </div>
+      )}
 
       {/* Relay mode toggle — only shown when MetaTxRelayer is configured */}
       {relayAvailable && (
