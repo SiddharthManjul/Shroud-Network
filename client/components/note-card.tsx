@@ -1,8 +1,50 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { Contract, JsonRpcProvider } from "ethers";
 import type { Note } from "@/lib/zktoken/types";
 
+const symbolCache = new Map<string, string>();
+
+function useTokenSymbol(tokenAddress: string): string | null {
+  const [symbol, setSymbol] = useState<string | null>(
+    symbolCache.get(tokenAddress.toLowerCase()) ?? null
+  );
+
+  useEffect(() => {
+    const key = tokenAddress.toLowerCase();
+    if (!key || key === "0x") return;
+    if (symbolCache.has(key)) {
+      setSymbol(symbolCache.get(key)!);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL);
+        const erc20 = new Contract(
+          tokenAddress,
+          ["function symbol() view returns (string)"],
+          provider
+        );
+        const s: string = await erc20.symbol();
+        symbolCache.set(key, s);
+        if (!cancelled) setSymbol(s);
+      } catch {
+        if (!cancelled) setSymbol(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [tokenAddress]);
+
+  return symbol;
+}
+
 export function NoteCard({ note }: { note: Note }) {
+  const symbol = useTokenSymbol(note.tokenAddress);
+  const displayName = symbol ? `Shroud ${symbol}` : "Shroud Token";
+
   return (
     <div
       className={`rounded-lg border p-4 transition-colors duration-200 ${
@@ -12,9 +54,14 @@ export function NoteCard({ note }: { note: Note }) {
       }`}
     >
       <div className="flex items-center justify-between">
-        <span className="font-mono text-sm text-[#888888]">
-          Leaf #{note.leafIndex === -1 ? "pending" : note.leafIndex}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-[#acf901]">
+            {displayName}
+          </span>
+          <span className="font-mono text-xs text-[#444444]">
+            #{note.leafIndex === -1 ? "pending" : note.leafIndex}
+          </span>
+        </div>
         <span
           className={`rounded-full px-2 py-0.5 text-xs font-medium ${
             note.spent
@@ -29,11 +76,18 @@ export function NoteCard({ note }: { note: Note }) {
         <span className="text-2xl font-bold text-[#acf901] break-all">
           {note.amount.toString()}
         </span>
-        <span className="ml-2 text-sm text-[#888888]">tokens</span>
+        <span className="ml-2 text-sm text-[#888888]">{symbol ?? "tokens"}</span>
       </div>
-      <div className="mt-2 text-xs font-mono text-[#444444] truncate min-w-0">
-        commitment: 0x{note.noteCommitment.toString(16).slice(0, 16)}...
+      <div className="mt-2 flex items-center gap-2 text-xs font-mono text-[#444444] min-w-0">
+        <span className="truncate">
+          commitment: 0x{note.noteCommitment.toString(16).slice(0, 16)}...
+        </span>
       </div>
+      {note.tokenAddress && note.tokenAddress !== "0x" && (
+        <div className="mt-1 text-xs font-mono text-[#333333] truncate">
+          token: {note.tokenAddress.slice(0, 6)}...{note.tokenAddress.slice(-4)}
+        </div>
+      )}
     </div>
   );
 }

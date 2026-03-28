@@ -10,7 +10,7 @@
 
 const headlines: string[] = [
   "Shroud Network testnet is live on Avalanche Fuji",
-  "Docs coming soon - join our Telegram for updates",
+  "Shroud now supports Unified Shielded Pool with multi-token gas payment",
   "Shroud Network is now live on X. Follow us @ShroudNetwork for the latest news and updates",
   "Shroud is now enabled with multi-token gas payment support"
 ];

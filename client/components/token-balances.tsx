@@ -1,9 +1,10 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import { useWallet } from "@/hooks/use-wallet";
 import { useNotes } from "@/hooks/use-notes";
 import { useToken } from "@/providers/token-provider";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { BrowserProvider, Contract, formatEther, formatUnits } from "ethers";
 import { TEST_TOKEN_ABI } from "@/lib/zktoken/abi/test-token";
 
@@ -23,6 +24,11 @@ export function TokenBalances() {
   const [avaxBalance, setAvaxBalance] = useState<string | null>(null);
   const [tokenInfo, setTokenInfo] = useState<TokenInfo | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  /** Call to force a balance re-fetch (e.g. after deposit/withdraw). */
+  const refreshBalances = useCallback(() => setRefreshKey((k) => k + 1), []);
 
   useEffect(() => {
     if (!address || !provider) {
@@ -68,10 +74,14 @@ export function TokenBalances() {
     }
 
     fetchBalances();
+
+    // Auto-refresh every 15 seconds to pick up on-chain changes
+    const interval = setInterval(fetchBalances, 15_000);
     return () => {
       cancelled = true;
+      clearInterval(interval);
     };
-  }, [address, provider, activeToken]);
+  }, [address, provider, activeToken, refreshKey]);
 
   if (!address) return null;
 
@@ -113,7 +123,7 @@ export function TokenBalances() {
         {tokenInfo && (
           <p className="mt-0.5 text-xs text-[#666666] font-mono">
             <span className="sm:hidden">{tokenInfo.address.slice(0, 6)}...{tokenInfo.address.slice(-4)}</span>
-            <span className="hidden sm:inline truncate block">{tokenInfo.address}</span>
+            <span className="hidden sm:inline truncate">{tokenInfo.address}</span>
           </p>
         )}
       </div>
