@@ -94,6 +94,11 @@ export const UNIFIED_SHIELDED_POOL_ABI = [
         "name": "noteCommitment",
         "type": "uint256",
         "internalType": "uint256"
+      },
+      {
+        "name": "encryptedMemo",
+        "type": "bytes",
+        "internalType": "bytes"
       }
     ],
     "outputs": [],
@@ -524,6 +529,12 @@ export const UNIFIED_SHIELDED_POOL_ABI = [
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
+      },
+      {
+        "name": "encryptedMemo",
+        "type": "bytes",
+        "indexed": false,
+        "internalType": "bytes"
       }
     ],
     "anonymous": false
