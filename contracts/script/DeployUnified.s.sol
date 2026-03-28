@@ -71,11 +71,13 @@ contract DeployUnified is Script {
         console.log("WithdrawVerifier:", address(withdrawVerifier));
 
         // -- 5. UnifiedShieldedPool ----------------------------------------
+        // amountScale = 1e18 — deposit(500) transfers 500 * 1e18 raw ERC20 wei
         UnifiedShieldedPool pool = new UnifiedShieldedPool(
             address(transferVerifier),
             address(withdrawVerifier),
             poseidonT2Addr,
-            poseidonT3Addr
+            poseidonT3Addr,
+            1e18
         );
         console.log("UnifiedPool    :", address(pool));
         console.log("Initial root   :", pool.getRoot());
