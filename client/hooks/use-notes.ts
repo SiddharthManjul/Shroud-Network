@@ -275,14 +275,32 @@ export function useNotes() {
           );
 
           let chainNotes;
-          if (activeToken?.poolType === "unified" && activeToken.assetId !== undefined) {
+          if (activeToken?.poolType === "unified") {
+            // For unified pool, gather all known tokens and scan once
+            const { computeAssetId } = await import("@/lib/zktoken/note");
+            const { UNIFIED_SHIELDED_POOL_ABI } = await import("@/lib/zktoken/abi/unified-shielded-pool");
+            const { Contract } = await import("ethers");
+
+            const knownTokens: Array<{ tokenAddress: string; assetId: bigint }> = [];
+            try {
+              const pool = new Contract(POOL_ADDRESS, UNIFIED_SHIELDED_POOL_ABI as never, provider);
+              const count = Number(await pool.getAllowedTokenCount());
+              for (let i = 0; i < count; i++) {
+                const addr = await pool.getAllowedToken(i) as string;
+                knownTokens.push({ tokenAddress: addr, assetId: await computeAssetId(addr) });
+              }
+            } catch {
+              if (TOKEN_ADDRESS && TOKEN_ADDRESS !== POOL_ADDRESS) {
+                knownTokens.push({ tokenAddress: TOKEN_ADDRESS, assetId: await computeAssetId(TOKEN_ADDRESS) });
+              }
+            }
+
             chainNotes = await scanChainForNotesUnified({
               provider: provider as never,
               poolAddress: POOL_ADDRESS,
               myPrivateKey: keypair.privateKey,
               myPublicKey: keypair.publicKey,
-              tokenAddress: TOKEN_ADDRESS,
-              assetId: activeToken.assetId,
+              knownTokens,
               existingNullifiers,
             });
           } else {
