@@ -27,15 +27,17 @@ const UNIFIED_CIRCUIT_PATHS = {
 /**
  * Build a PoolConfig from a PoolInfo entry.
  *
- * Unified pool entries have `poolType: "unified"` and `assetId` set.
+ * Unified pool entries have `poolType: "unified"`.
+ * The `assetId` may come from the pool entry or be overridden (e.g. from a note).
  * All others default to V1.
  */
-export function getPoolConfig(poolInfo: PoolInfo): PoolConfig {
-  if (poolInfo.poolType === "unified" && poolInfo.assetId !== undefined) {
+export function getPoolConfig(poolInfo: PoolInfo, overrideAssetId?: bigint): PoolConfig {
+  if (poolInfo.poolType === "unified") {
+    const assetId = overrideAssetId ?? poolInfo.assetId ?? 0n;
     return {
       poolType: "unified",
       treeDepth: 24,
-      assetId: poolInfo.assetId,
+      assetId,
       tokenAddress: poolInfo.token,
       circuitPaths: UNIFIED_CIRCUIT_PATHS,
     } satisfies UnifiedPoolConfig;
