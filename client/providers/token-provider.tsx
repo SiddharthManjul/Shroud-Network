@@ -9,9 +9,8 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
-import { Contract, JsonRpcProvider } from "ethers";
+import { JsonRpcProvider } from "ethers";
 import type { PoolInfo } from "@/lib/zktoken/registry";
-import { UNIFIED_SHIELDED_POOL_ABI } from "@/lib/zktoken/abi/unified-shielded-pool";
 
 const STORAGE_KEY = "zktoken_active_token";
 
@@ -83,41 +82,24 @@ export function TokenProvider({ children }: { children: ReactNode }) {
       const { fetchAllPools } = await import("@/lib/zktoken/registry");
       const pools = await fetchAllPools(registryAddress, readProviderRef.current!);
 
-      // Mark V1 pools explicitly
+      // Mark all fetched pools as V1 initially
       for (const p of pools) {
         if (!p.poolType) p.poolType = "v1";
       }
 
-      // Query unified pool for whitelisted tokens and add unified entries
+      // Add a single "Unified Pool" entry if the unified pool is configured.
+      // V1 pool entries stay as-is — they are independent single-token pools.
+      // The unified pool's deposit form handles token selection via wallet scanning.
       if (unifiedPoolAddress) {
-        try {
-          const unifiedPool = new Contract(
-            unifiedPoolAddress,
-            UNIFIED_SHIELDED_POOL_ABI as never,
-            readProviderRef.current!
-          );
-          const tokenCount = Number(await unifiedPool.getAllowedTokenCount());
-          for (let i = 0; i < tokenCount; i++) {
-            const tokenAddr: string = await unifiedPool.getAllowedToken(i);
-            const assetId: bigint = await unifiedPool.getAssetId(tokenAddr);
-            // Find matching V1 pool for symbol/decimals info
-            const v1Match = pools.find(
-              (p) => p.token.toLowerCase() === tokenAddr.toLowerCase()
-            );
-            pools.push({
-              pool: unifiedPoolAddress,
-              paymaster: "", // No paymaster for unified pool (direct relay)
-              token: tokenAddr,
-              symbol: v1Match ? `${v1Match.symbol} (Unified)` : "Token (Unified)",
-              decimals: v1Match?.decimals ?? 18,
-              createdAt: 0,
-              poolType: "unified",
-              assetId,
-            });
-          }
-        } catch (err) {
-          console.warn("[TokenProvider] Failed to query unified pool:", err);
-        }
+        pools.push({
+          pool: unifiedPoolAddress,
+          paymaster: "",
+          token: unifiedPoolAddress, // placeholder — actual token chosen at deposit time
+          symbol: "Unified Pool",
+          decimals: 18,
+          createdAt: 0,
+          poolType: "unified",
+        });
       }
 
       setTokens(pools);
