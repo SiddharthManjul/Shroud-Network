@@ -1441,17 +1441,20 @@ export async function depositUnified(params: {
   if (!signer.provider) throw new Error("depositUnified: signer has no provider");
 
   const assetId = await computeAssetId(tokenAddress);
+
+  // Note stores the unscaled amount (fits in uint64 for circuit range proofs).
+  // The contract scales internally by amountScale (same pattern as V1).
   const pendingNote = await createNote(amount, ownerPublicKey, tokenAddress, 0, assetId);
 
+  // Approve the ERC20-scaled amount (contract does transferFrom for amount * amountScale)
   const scaledAmount = amount * 10n ** 18n;
-
-  // Approve token transfer
   const erc20Iface = new Interface(TEST_TOKEN_ABI);
   const approveData = erc20Iface.encodeFunctionData("approve", [poolAddress, scaledAmount]);
   const approveTx = await sendWithGas(signer, { to: tokenAddress, data: approveData });
   await approveTx.wait();
 
   // Deposit into unified pool: deposit(token, amount, noteCommitment)
+  // Contract multiplies amount by amountScale for the actual ERC20 transfer
   const poolIface = new Interface(UNIFIED_SHIELDED_POOL_ABI as never);
   const depositData = poolIface.encodeFunctionData("deposit", [
     tokenAddress,
