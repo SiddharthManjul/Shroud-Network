@@ -1178,8 +1178,10 @@ async function _finalizeTransferNotes(
 
 // ─── Scan chain for incoming notes (memo trial decryption) ────────────────
 
-/** Default deploy block for chain scanning. Updated to match current pool deployment. */
+/** V1 pool deploy block on Fuji. */
 const SCAN_DEPLOY_BLOCK = 52460968;
+/** Unified pool deploy block on Fuji (first event at 53310599). */
+const UNIFIED_DEPLOY_BLOCK = 53310500;
 const SCAN_CHUNK_SIZE = 2048;
 
 /**
@@ -1567,7 +1569,7 @@ export async function relayTransferUnified(
 
   // 1. Sync Merkle tree (depth 24, unified ABI)
   const tree = new MerkleTreeSync(UNIFIED_TREE_DEPTH);
-  await tree.syncFromChain(provider, poolAddress, SCAN_DEPLOY_BLOCK, UNIFIED_SHIELDED_POOL_ABI as never);
+  await tree.syncFromChain(provider, poolAddress, UNIFIED_DEPLOY_BLOCK, UNIFIED_SHIELDED_POOL_ABI as never);
   const merklePath = await tree.getMerklePath(inputNote.leafIndex);
 
   // 2. Generate proof with assetId
@@ -1626,7 +1628,7 @@ export async function relayTransferUnified(
 
   // 5. Finalize notes
   const postTree = new MerkleTreeSync(UNIFIED_TREE_DEPTH);
-  await postTree.syncFromChain(provider, poolAddress, SCAN_DEPLOY_BLOCK, UNIFIED_SHIELDED_POOL_ABI as never);
+  await postTree.syncFromChain(provider, poolAddress, UNIFIED_DEPLOY_BLOCK, UNIFIED_SHIELDED_POOL_ABI as never);
 
   const recipientIdx = postTree.findLeafIndex(proofResult.recipientNote.noteCommitment);
   const changeIdx = postTree.findLeafIndex(proofResult.changeNote.noteCommitment);
@@ -1692,7 +1694,7 @@ export async function relayWithdrawUnified(
 
   // 1. Sync Merkle tree (depth 24)
   const tree = new MerkleTreeSync(UNIFIED_TREE_DEPTH);
-  await tree.syncFromChain(provider, poolAddress, SCAN_DEPLOY_BLOCK, UNIFIED_SHIELDED_POOL_ABI as never);
+  await tree.syncFromChain(provider, poolAddress, UNIFIED_DEPLOY_BLOCK, UNIFIED_SHIELDED_POOL_ABI as never);
 
   const treeLeaves = tree.getLeaves();
   if (inputNote.leafIndex >= treeLeaves.length) {
@@ -1763,7 +1765,7 @@ export async function relayWithdrawUnified(
   let finalizedChange = proofResult.changeNote;
   if (finalizedChange) {
     const postTree = new MerkleTreeSync(UNIFIED_TREE_DEPTH);
-    await postTree.syncFromChain(provider, poolAddress, SCAN_DEPLOY_BLOCK, UNIFIED_SHIELDED_POOL_ABI as never);
+    await postTree.syncFromChain(provider, poolAddress, UNIFIED_DEPLOY_BLOCK, UNIFIED_SHIELDED_POOL_ABI as never);
     const changeIdx = postTree.findLeafIndex(finalizedChange.noteCommitment);
     if (changeIdx >= 0) {
       finalizedChange = await finaliseNote(
@@ -1791,13 +1793,13 @@ export async function scanChainForNotesUnified(params: {
   poolAddress: string;
   myPrivateKey: bigint;
   myPublicKey: import("./types").BabyJubPoint;
-  tokenAddress: string;
-  assetId: bigint;
+  /** Known token→assetId pairs to try when reconstructing notes. */
+  knownTokens: Array<{ tokenAddress: string; assetId: bigint }>;
   existingNullifiers?: Set<string>;
   fromBlock?: number;
 }): Promise<Note[]> {
-  const { provider, poolAddress, myPrivateKey, myPublicKey, tokenAddress, assetId, existingNullifiers } = params;
-  const startBlock = params.fromBlock ?? SCAN_DEPLOY_BLOCK;
+  const { provider, poolAddress, myPrivateKey, myPublicKey, knownTokens, existingNullifiers } = params;
+  const startBlock = params.fromBlock ?? UNIFIED_DEPLOY_BLOCK;
 
   const iface = new Interface(UNIFIED_SHIELDED_POOL_ABI as never);
   const depositTopic = iface.getEvent("Deposit")!.topicHash;
@@ -1820,18 +1822,19 @@ export async function scanChainForNotesUnified(params: {
   });
 
   let leafIndex = 0;
-  const memoEvents: Array<{ memoBytes: Uint8Array; commitment: bigint; leafIndex: number; blockNumber: number }> = [];
+  // Store token address from Deposit events (indexed); Transfer/Withdrawal events don't include it.
+  const memoEvents: Array<{ memoBytes: Uint8Array; commitment: bigint; leafIndex: number; blockNumber: number; tokenAddress?: string }> = [];
 
   for (const log of allLogs) {
     const topic = log.topics[0];
     if (topic === depositTopic) {
-      // Deposits now include an encrypted self-memo for recovery
       const parsed = iface.parseLog(log);
       if (parsed) {
         const commitment = parsed.args["commitment"] as bigint;
         const memoHex = parsed.args["encryptedMemo"] as string;
+        const token = parsed.args["token"] as string;
         if (memoHex && memoHex.length > 2) {
-          memoEvents.push({ memoBytes: hexToBytes(memoHex.slice(2)), commitment, leafIndex, blockNumber: log.blockNumber });
+          memoEvents.push({ memoBytes: hexToBytes(memoHex.slice(2)), commitment, leafIndex, blockNumber: log.blockNumber, tokenAddress: token });
         }
       }
       leafIndex++;
@@ -1856,9 +1859,10 @@ export async function scanChainForNotesUnified(params: {
       if (parsed) {
         const changeCommitment = parsed.args["changeCommitment"] as bigint;
         const memoHex = parsed.args["encryptedMemo"] as string;
+        const token = parsed.args["token"] as string;
         if (changeCommitment !== 0n) {
           if (memoHex && memoHex.length > 2) {
-            memoEvents.push({ memoBytes: hexToBytes(memoHex.slice(2)), commitment: changeCommitment, leafIndex, blockNumber: log.blockNumber });
+            memoEvents.push({ memoBytes: hexToBytes(memoHex.slice(2)), commitment: changeCommitment, leafIndex, blockNumber: log.blockNumber, tokenAddress: token });
           }
           leafIndex++;
         }
@@ -1871,9 +1875,38 @@ export async function scanChainForNotesUnified(params: {
     const memoData = await decryptMemo(event.memoBytes, myPrivateKey);
     if (memoData === null) continue;
 
-    const note = await noteFromMemoData(memoData, myPublicKey, tokenAddress, event.leafIndex, event.blockNumber, assetId);
-    if (existingNullifiers?.has(note.nullifier.toString())) continue;
-    discoveredNotes.push(note);
+    // Determine the correct token/assetId for this note.
+    // Deposit and Withdrawal events include the token address directly.
+    // Transfer events don't — try each known token and verify the commitment matches.
+    let matched = false;
+
+    if (event.tokenAddress) {
+      // Token known from event — compute assetId and reconstruct
+      const aid = await computeAssetId(event.tokenAddress);
+      const note = await noteFromMemoData(memoData, myPublicKey, event.tokenAddress, event.leafIndex, event.blockNumber, aid);
+      if (note.noteCommitment === event.commitment) {
+        if (!existingNullifiers?.has(note.nullifier.toString())) {
+          discoveredNotes.push(note);
+        }
+        matched = true;
+      }
+    }
+
+    if (!matched) {
+      // Try each known token until commitment matches
+      for (const { tokenAddress, assetId } of knownTokens) {
+        const note = await noteFromMemoData(memoData, myPublicKey, tokenAddress, event.leafIndex, event.blockNumber, assetId);
+        if (note.noteCommitment === event.commitment) {
+          if (!existingNullifiers?.has(note.nullifier.toString())) {
+            discoveredNotes.push(note);
+          }
+          matched = true;
+          break;
+        }
+      }
+    }
+
+    // If no token matched (unknown token in pool), skip this memo
   }
 
   return discoveredNotes;
