@@ -8,6 +8,7 @@ import { useToken } from "@/providers/token-provider";
 
 const STORAGE_PREFIX = "zktoken_notes_";
 const SCAN_BLOCK_KEY = "zktoken_last_scan_block";
+const UNIFIED_STORAGE_SUFFIX = "_unified";
 
 /**
  * Track which keypair+token combos have already been auto-scanned this session.
@@ -17,10 +18,14 @@ const SCAN_BLOCK_KEY = "zktoken_last_scan_block";
 const autoScannedKeys = new Set<string>();
 
 /** Derive the localStorage key for a given shielded public key + token address. */
-function storageKeyFor(pkX: bigint, tokenAddress?: string): string {
+function storageKeyFor(pkX: bigint, tokenAddress?: string, poolType?: "v1" | "unified"): string {
   const base = STORAGE_PREFIX + pkX.toString(16).slice(0, 16);
   if (tokenAddress) {
-    return base + "_" + tokenAddress.toLowerCase().slice(0, 10);
+    const addrSuffix = "_" + tokenAddress.toLowerCase().slice(0, 10);
+    if (poolType === "unified") {
+      return base + addrSuffix + UNIFIED_STORAGE_SUFFIX;
+    }
+    return base + addrSuffix;
   }
   return base;
 }
@@ -59,14 +64,17 @@ export function useNotes() {
           "@/lib/zktoken/pending-tx"
         );
         const { Contract, JsonRpcProvider } = await import("ethers");
-        const { SHIELDED_POOL_ABI } = await import(
-          "@/lib/zktoken/abi/shielded-pool"
-        );
-
         const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL);
 
         const count = await reconcilePendingTxs({
           checkNullifier: async (nullifier, poolAddr) => {
+            // Try unified pool first (isSpentNullifier), fall back to V1 (isSpent)
+            if (activeToken?.poolType === "unified") {
+              const { UNIFIED_SHIELDED_POOL_ABI } = await import("@/lib/zktoken/abi/unified-shielded-pool");
+              const pool = new Contract(poolAddr, UNIFIED_SHIELDED_POOL_ABI as never, provider);
+              return (await pool.isSpentNullifier(nullifier)) as boolean;
+            }
+            const { SHIELDED_POOL_ABI } = await import("@/lib/zktoken/abi/shielded-pool");
             const pool = new Contract(poolAddr, SHIELDED_POOL_ABI, provider);
             return (await pool.isSpent(nullifier)) as boolean;
           },
@@ -104,7 +112,7 @@ export function useNotes() {
       return;
     }
 
-    const key = storageKeyFor(keypair.publicKey[0], TOKEN_ADDRESS);
+    const key = storageKeyFor(keypair.publicKey[0], TOKEN_ADDRESS, activeToken?.poolType);
     currentKeyRef.current = key;
 
     try {
@@ -259,20 +267,34 @@ export function useNotes() {
       {
         console.log("[use-notes] Falling back to chain scan...");
         try {
-          const { scanChainForNotes } = await import("@/lib/zktoken/transaction");
+          const { scanChainForNotes, scanChainForNotesUnified } = await import("@/lib/zktoken/transaction");
           const { JsonRpcProvider } = await import("ethers");
           const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL);
+          const existingNullifiers = new Set(
+            storeRef.current.getAll().map((n) => n.nullifier.toString())
+          );
 
-          const chainNotes = await scanChainForNotes({
-            provider: provider as never,
-            poolAddress: POOL_ADDRESS,
-            myPrivateKey: keypair.privateKey,
-            myPublicKey: keypair.publicKey,
-            tokenAddress: TOKEN_ADDRESS,
-            existingNullifiers: new Set(
-              storeRef.current.getAll().map((n) => n.nullifier.toString())
-            ),
-          });
+          let chainNotes;
+          if (activeToken?.poolType === "unified" && activeToken.assetId !== undefined) {
+            chainNotes = await scanChainForNotesUnified({
+              provider: provider as never,
+              poolAddress: POOL_ADDRESS,
+              myPrivateKey: keypair.privateKey,
+              myPublicKey: keypair.publicKey,
+              tokenAddress: TOKEN_ADDRESS,
+              assetId: activeToken.assetId,
+              existingNullifiers,
+            });
+          } else {
+            chainNotes = await scanChainForNotes({
+              provider: provider as never,
+              poolAddress: POOL_ADDRESS,
+              myPrivateKey: keypair.privateKey,
+              myPublicKey: keypair.publicKey,
+              tokenAddress: TOKEN_ADDRESS,
+              existingNullifiers,
+            });
+          }
 
           for (const note of chainNotes) {
             if (!existingCommitments.has(note.noteCommitment.toString())) {
@@ -293,20 +315,27 @@ export function useNotes() {
       if (POOL_ADDRESS) {
         try {
           const { Contract, JsonRpcProvider } = await import("ethers");
-          const { SHIELDED_POOL_ABI } = await import(
-            "@/lib/zktoken/abi/shielded-pool"
-          );
           const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL);
-          const pool = new Contract(POOL_ADDRESS, SHIELDED_POOL_ABI, provider);
+          let poolAbi;
+          if (activeToken?.poolType === "unified") {
+            const { UNIFIED_SHIELDED_POOL_ABI } = await import("@/lib/zktoken/abi/unified-shielded-pool");
+            poolAbi = UNIFIED_SHIELDED_POOL_ABI;
+          } else {
+            const { SHIELDED_POOL_ABI } = await import("@/lib/zktoken/abi/shielded-pool");
+            poolAbi = SHIELDED_POOL_ABI;
+          }
+          const pool = new Contract(POOL_ADDRESS, poolAbi, provider);
 
           const unspentNotes = storeRef.current
             .getAll()
             .filter((n) => !n.spent && n.nullifier !== 0n);
 
           if (unspentNotes.length > 0) {
+            // Unified pool uses isSpentNullifier(), V1 uses isSpent()
+            const isSpentFn = activeToken?.poolType === "unified" ? "isSpentNullifier" : "isSpent";
             const checks = await Promise.all(
               unspentNotes.map((n) =>
-                pool.isSpent(n.nullifier).catch(() => false)
+                pool[isSpentFn](n.nullifier).catch(() => false)
               )
             );
 
@@ -338,7 +367,7 @@ export function useNotes() {
   useEffect(() => {
     if (!keypair || !POOL_ADDRESS || !TOKEN_ADDRESS) return;
 
-    const scanKey = keypair.publicKey[0].toString(16).slice(0, 16) + "_" + TOKEN_ADDRESS.toLowerCase();
+    const scanKey = keypair.publicKey[0].toString(16).slice(0, 16) + "_" + TOKEN_ADDRESS.toLowerCase() + (activeToken?.poolType === "unified" ? "_unified" : "");
 
     // Skip if already auto-scanned this session (across all hook instances)
     if (autoScannedKeys.has(scanKey)) return;
