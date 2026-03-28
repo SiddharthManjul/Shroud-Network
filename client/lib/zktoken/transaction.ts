@@ -1452,7 +1452,7 @@ export async function depositUnified(params: {
   await approveTx.wait();
 
   // Deposit into unified pool: deposit(token, amount, noteCommitment)
-  const poolIface = new Interface(UNIFIED_SHIELDED_POOL_ABI as readonly unknown[]);
+  const poolIface = new Interface(UNIFIED_SHIELDED_POOL_ABI as never);
   const depositData = poolIface.encodeFunctionData("deposit", [
     tokenAddress,
     amount,
@@ -1475,7 +1475,7 @@ export async function waitForUnifiedDeposit(
   const receipt = await tx.wait();
   if (receipt.status !== 1) throw new Error("waitForUnifiedDeposit: transaction reverted");
 
-  const poolIface = new Interface(UNIFIED_SHIELDED_POOL_ABI as readonly unknown[]);
+  const poolIface = new Interface(UNIFIED_SHIELDED_POOL_ABI as never);
   const depositTopic = poolIface.getEvent("Deposit")!.topicHash;
 
   // Try receipt logs first
@@ -1553,7 +1553,7 @@ export async function relayTransferUnified(
 
   // 1. Sync Merkle tree (depth 24, unified ABI)
   const tree = new MerkleTreeSync(UNIFIED_TREE_DEPTH);
-  await tree.syncFromChain(provider, poolAddress, SCAN_DEPLOY_BLOCK, UNIFIED_SHIELDED_POOL_ABI as readonly unknown[]);
+  await tree.syncFromChain(provider, poolAddress, SCAN_DEPLOY_BLOCK, UNIFIED_SHIELDED_POOL_ABI as never);
   const merklePath = await tree.getMerklePath(inputNote.leafIndex);
 
   // 2. Generate proof with assetId
@@ -1612,7 +1612,7 @@ export async function relayTransferUnified(
 
   // 5. Finalize notes
   const postTree = new MerkleTreeSync(UNIFIED_TREE_DEPTH);
-  await postTree.syncFromChain(provider, poolAddress, SCAN_DEPLOY_BLOCK, UNIFIED_SHIELDED_POOL_ABI as readonly unknown[]);
+  await postTree.syncFromChain(provider, poolAddress, SCAN_DEPLOY_BLOCK, UNIFIED_SHIELDED_POOL_ABI as never);
 
   const recipientIdx = postTree.findLeafIndex(proofResult.recipientNote.noteCommitment);
   const changeIdx = postTree.findLeafIndex(proofResult.changeNote.noteCommitment);
@@ -1678,7 +1678,7 @@ export async function relayWithdrawUnified(
 
   // 1. Sync Merkle tree (depth 24)
   const tree = new MerkleTreeSync(UNIFIED_TREE_DEPTH);
-  await tree.syncFromChain(provider, poolAddress, SCAN_DEPLOY_BLOCK, UNIFIED_SHIELDED_POOL_ABI as readonly unknown[]);
+  await tree.syncFromChain(provider, poolAddress, SCAN_DEPLOY_BLOCK, UNIFIED_SHIELDED_POOL_ABI as never);
 
   const treeLeaves = tree.getLeaves();
   if (inputNote.leafIndex >= treeLeaves.length) {
@@ -1749,7 +1749,7 @@ export async function relayWithdrawUnified(
   let finalizedChange = proofResult.changeNote;
   if (finalizedChange) {
     const postTree = new MerkleTreeSync(UNIFIED_TREE_DEPTH);
-    await postTree.syncFromChain(provider, poolAddress, SCAN_DEPLOY_BLOCK, UNIFIED_SHIELDED_POOL_ABI as readonly unknown[]);
+    await postTree.syncFromChain(provider, poolAddress, SCAN_DEPLOY_BLOCK, UNIFIED_SHIELDED_POOL_ABI as never);
     const changeIdx = postTree.findLeafIndex(finalizedChange.noteCommitment);
     if (changeIdx >= 0) {
       finalizedChange = await finaliseNote(
@@ -1785,7 +1785,7 @@ export async function scanChainForNotesUnified(params: {
   const { provider, poolAddress, myPrivateKey, myPublicKey, tokenAddress, assetId, existingNullifiers } = params;
   const startBlock = params.fromBlock ?? SCAN_DEPLOY_BLOCK;
 
-  const iface = new Interface(UNIFIED_SHIELDED_POOL_ABI as readonly unknown[]);
+  const iface = new Interface(UNIFIED_SHIELDED_POOL_ABI as never);
   const depositTopic = iface.getEvent("Deposit")!.topicHash;
   const transferTopic = iface.getEvent("PrivateTransfer")!.topicHash;
   const withdrawalTopic = iface.getEvent("Withdrawal")!.topicHash;
