@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
-import { useState, useCallback } from "react";
-import { JsonRpcProvider } from "ethers";
+import { useState, useCallback, useEffect } from "react";
+import { Contract, JsonRpcProvider } from "ethers";
 import { useZkToken } from "@/hooks/use-zktoken";
 import { useNotes } from "@/hooks/use-notes";
 import { useShieldedKey } from "@/hooks/use-shielded-key";
@@ -34,10 +34,51 @@ export function TransferForm() {
   const { ready } = useZkToken();
   const { unspent, saveNote, markSpent } = useNotes();
   const { keypair, deriveKey } = useShieldedKey();
-  const { activeToken } = useToken();
+  const { tokens, activeToken } = useToken();
 
+  const isUnified = activeToken?.poolType === "unified";
   const POOL_ADDRESS = activeToken?.pool ?? "";
   const tokenSymbol = activeToken?.symbol ?? "Token";
+
+  // Resolve token symbols per-note for unified pool
+  const [resolvedSymbols, setResolvedSymbols] = useState<Record<string, string>>({});
+
+  const symbolForNote = useCallback((note: Note): string => {
+    if (!isUnified) return tokenSymbol;
+    const addr = note.tokenAddress?.toLowerCase();
+    if (!addr) return tokenSymbol;
+    const known = tokens.find((t) => t.token.toLowerCase() === addr);
+    if (known) return known.symbol;
+    if (resolvedSymbols[addr]) return resolvedSymbols[addr];
+    return addr.slice(0, 6) + "…" + addr.slice(-4);
+  }, [isUnified, tokenSymbol, tokens, resolvedSymbols]);
+
+  useEffect(() => {
+    if (!isUnified || unspent.length === 0) return;
+    const unknownAddrs = new Set<string>();
+    for (const note of unspent) {
+      const addr = note.tokenAddress?.toLowerCase();
+      if (!addr) continue;
+      if (tokens.find((t) => t.token.toLowerCase() === addr)) continue;
+      if (resolvedSymbols[addr]) continue;
+      unknownAddrs.add(addr);
+    }
+    if (unknownAddrs.size === 0) return;
+
+    (async () => {
+      const rpc = new JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL);
+      const resolved: Record<string, string> = {};
+      for (const addr of unknownAddrs) {
+        try {
+          const erc20 = new Contract(addr, ["function symbol() view returns (string)"], rpc);
+          resolved[addr] = await erc20.symbol() as string;
+        } catch { /* skip */ }
+      }
+      if (Object.keys(resolved).length > 0) {
+        setResolvedSymbols((prev) => ({ ...prev, ...resolved }));
+      }
+    })();
+  }, [isUnified, unspent, tokens, resolvedSymbols]);
   const [selectedNoteIdx, setSelectedNoteIdx] = useState<number>(-1);
   const [recipientPkX, setRecipientPkX] = useState("");
   const [recipientPkY, setRecipientPkY] = useState("");
@@ -195,7 +236,7 @@ export function TransferForm() {
               { value: "-1", label: "Choose a note..." },
               ...unspent.map((note, i) => ({
                 value: String(i),
-                label: `${note.amount.toString()} ${tokenSymbol} (leaf #${note.leafIndex})`,
+                label: `${note.amount.toString()} ${symbolForNote(note)} (leaf #${note.leafIndex})`,
               })),
             ]}
             onChange={(val) => setSelectedNoteIdx(Number(val))}
