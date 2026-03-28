@@ -182,7 +182,7 @@ export function WithdrawForm() {
       // ── Unified pool relay path ────────────────────────────────────────
       const { relayWithdraw, relayWithdrawUnified } = await import("@/lib/zktoken/transaction");
       const rpcProvider = provider ?? new JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL);
-      const poolConfig = activeToken ? getPoolConfig(activeToken) : null;
+      const poolConfig = activeToken ? getPoolConfig(activeToken, selectedNote.assetId) : null;
 
       setStatus("Generating ZK proof (this may take a moment)...");
       let result;
@@ -199,7 +199,7 @@ export function WithdrawForm() {
             wasmPath: poolConfig.circuitPaths.withdrawWasm,
             zkeyPath: poolConfig.circuitPaths.withdrawZkey,
             assetId: poolConfig.assetId,
-            tokenAddress: poolConfig.tokenAddress,
+            tokenAddress: selectedNote.tokenAddress,
           });
         } else {
           // ── Paymaster relay path (V1 / existing flow) ──────────────────
