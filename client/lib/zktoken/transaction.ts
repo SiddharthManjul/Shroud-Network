@@ -1441,22 +1441,36 @@ export async function depositUnified(params: {
   if (!signer.provider) throw new Error("depositUnified: signer has no provider");
 
   const assetId = await computeAssetId(tokenAddress);
+
+  // Note stores the unscaled amount (fits in uint64 for circuit range proofs).
+  // The contract scales internally by amountScale (same pattern as V1).
   const pendingNote = await createNote(amount, ownerPublicKey, tokenAddress, 0, assetId);
 
+  // Approve the ERC20-scaled amount (contract does transferFrom for amount * amountScale)
   const scaledAmount = amount * 10n ** 18n;
-
-  // Approve token transfer
   const erc20Iface = new Interface(TEST_TOKEN_ABI);
   const approveData = erc20Iface.encodeFunctionData("approve", [poolAddress, scaledAmount]);
   const approveTx = await sendWithGas(signer, { to: tokenAddress, data: approveData });
   await approveTx.wait();
 
-  // Deposit into unified pool: deposit(token, amount, noteCommitment)
+  // Encrypt note data to own public key for on-chain recovery
+  const { encryptMemo } = await import("./encryption");
+  const memoData = {
+    amount: pendingNote.amount,
+    blinding: pendingNote.blinding,
+    secret: pendingNote.secret,
+    nullifierPreimage: pendingNote.nullifierPreimage,
+  };
+  const encryptedMemo = await encryptMemo(memoData, ownerPublicKey);
+  const memoHex = "0x" + Array.from(encryptedMemo).map(b => b.toString(16).padStart(2, "0")).join("");
+
+  // Deposit into unified pool: deposit(token, amount, noteCommitment, encryptedMemo)
   const poolIface = new Interface(UNIFIED_SHIELDED_POOL_ABI as never);
   const depositData = poolIface.encodeFunctionData("deposit", [
     tokenAddress,
     amount,
     pendingNote.noteCommitment,
+    memoHex,
   ]);
   const tx = await sendWithGas(signer, { to: poolAddress, data: depositData });
 
@@ -1811,6 +1825,15 @@ export async function scanChainForNotesUnified(params: {
   for (const log of allLogs) {
     const topic = log.topics[0];
     if (topic === depositTopic) {
+      // Deposits now include an encrypted self-memo for recovery
+      const parsed = iface.parseLog(log);
+      if (parsed) {
+        const commitment = parsed.args["commitment"] as bigint;
+        const memoHex = parsed.args["encryptedMemo"] as string;
+        if (memoHex && memoHex.length > 2) {
+          memoEvents.push({ memoBytes: hexToBytes(memoHex.slice(2)), commitment, leafIndex, blockNumber: log.blockNumber });
+        }
+      }
       leafIndex++;
     } else if (topic === transferTopic) {
       const parsed = iface.parseLog(log);
