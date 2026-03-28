@@ -1,8 +1,7 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { Contract, parseEther, JsonRpcProvider, formatUnits } from "ethers";
+import { Contract, JsonRpcProvider, formatUnits } from "ethers";
 import { useWallet } from "@/hooks/use-wallet";
 import { useZkToken } from "@/hooks/use-zktoken";
 import { useNotes } from "@/hooks/use-notes";
@@ -27,109 +26,115 @@ const toggleBtn = (active: boolean) =>
       : "bg-[#0d0d0d] text-[#888888] border border-[#2a2a2a] hover:text-[#acf901] hover:border-[#acf901]/30"
   }`;
 
-const META_TX_RELAYER_ADDRESS = process.env.NEXT_PUBLIC_META_TX_RELAYER_ADDRESS;
+const UNIFIED_POOL_ADDRESS = process.env.NEXT_PUBLIC_UNIFIED_SHIELDED_POOL_ADDRESS ?? "";
 
-// Fee: 0.1% of deposit, minimum 1 token unit
-function computeFee(amount: bigint): bigint {
-  const fee = amount / 1000n;
-  return fee < 1n ? 1n : fee;
+/** Wallet token info discovered by scanning ERC20 balances. */
+interface WalletToken {
+  address: string;
+  symbol: string;
+  decimals: number;
+  balance: bigint;
+  formatted: string;
 }
-
 
 export function DepositForm() {
   const { ready } = useZkToken();
   const { address, signer, provider, connect: connectWallet, connecting: walletConnecting, disconnect: disconnectWallet } = useWallet();
   const { notes, saveNote } = useNotes();
   const { keypair, deriveKey } = useShieldedKey();
-  const { tokens, activeToken, setActiveToken } = useToken();
+  const { tokens, activeToken } = useToken();
 
-  // ── Pool / token selection (local — token switches within a pool don't affect navbar) ──
-  // Distinct pools derived from the tokens list
-  const distinctPools = useMemo(() => {
-    const seen = new Map<string, { pool: string; poolType: string; label: string }>();
-    for (const t of tokens) {
-      const key = t.pool.toLowerCase();
-      if (!seen.has(key)) {
-        seen.set(key, {
-          pool: t.pool,
-          poolType: t.poolType ?? "v1",
-          label: t.poolType === "unified" ? "Unified Pool" : t.symbol,
-        });
-      }
-    }
-    return [...seen.values()];
-  }, [tokens]);
+  const isUnified = activeToken?.poolType === "unified";
 
-  // Selected pool address (local state)
-  const [selectedPoolAddr, setSelectedPoolAddr] = useState<string>(
-    () => activeToken?.pool.toLowerCase() ?? ""
-  );
+  // ── V1 pool values (used when !isUnified) ──────────────────────────
+  const v1PoolAddress = activeToken?.pool ?? "";
+  const v1TokenAddress = activeToken?.token ?? "";
+  const v1Symbol = activeToken?.symbol ?? "Token";
 
-  // Tokens available in the selected pool
-  const poolTokens = useMemo(
-    () => tokens.filter((t) => t.pool.toLowerCase() === selectedPoolAddr),
-    [tokens, selectedPoolAddr]
-  );
+  // ── Wallet token discovery (unified pool only) ─────────────────────
+  const [walletTokens, setWalletTokens] = useState<WalletToken[]>([]);
+  const [loadingTokens, setLoadingTokens] = useState(false);
 
-  // Selected token within the pool (local state — doesn't touch global activeToken)
-  const [selectedToken, setSelectedToken] = useState(() => activeToken);
+  const discoverWalletTokens = useCallback(async () => {
+    if (!address || !isUnified) { setWalletTokens([]); return; }
+    setLoadingTokens(true);
 
-  // Keep local selection in sync when the global pool changes (e.g. via navbar)
-  useEffect(() => {
-    if (!activeToken) return;
-    const poolAddr = activeToken.pool.toLowerCase();
-    setSelectedPoolAddr(poolAddr);
-    setSelectedToken(activeToken);
-  }, [activeToken?.pool]);
-
-  // When pool changes, update global activeToken (so notes are saved under the right key)
-  // and default the token to the first one in that pool.
-  const handlePoolChange = useCallback((poolAddr: string) => {
-    setSelectedPoolAddr(poolAddr);
-    const first = tokens.find((t) => t.pool.toLowerCase() === poolAddr);
-    if (first) {
-      setSelectedToken(first);
-      setActiveToken(first);
-    }
-  }, [tokens, setActiveToken]);
-
-  const POOL_ADDRESS = selectedToken?.pool ?? "";
-  const TOKEN_ADDRESS = selectedToken?.token ?? "";
-  const tokenSymbol = selectedToken?.symbol ?? "Token";
-  const [amount, setAmount] = useState("");
-
-  // Wallet balances keyed by token address (lowercase)
-  const [walletBalances, setWalletBalances] = useState<Record<string, string>>({});
-
-  const fetchWalletBalances = useCallback(async () => {
-    if (!address) return;
     const rpcProvider = provider ?? new JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL);
-    // Deduplicate token addresses
-    const uniqueTokens = [...new Map(tokens.map((t) => [t.token.toLowerCase(), t])).values()];
     const { TEST_TOKEN_ABI } = await import("@/lib/zktoken/abi/test-token");
-    const results: Record<string, string> = {};
-    await Promise.all(
-      uniqueTokens.map(async (t) => {
-        try {
-          const erc20 = new Contract(t.token, TEST_TOKEN_ABI, rpcProvider as never);
-          const [balance, decimals] = await Promise.all([
-            erc20.balanceOf(address),
-            erc20.decimals(),
-          ]);
-          results[t.token.toLowerCase()] = formatUnits(balance as bigint, Number(decimals));
-        } catch {
-          // ignore
+
+    // Gather all unique ERC20 addresses: registry tokens + unified pool on-chain list
+    const seen = new Set<string>();
+    const addresses: string[] = [];
+    const addAddr = (addr: string) => {
+      const key = addr.toLowerCase();
+      if (key && !seen.has(key)) { seen.add(key); addresses.push(addr); }
+    };
+    for (const t of tokens) addAddr(t.token);
+
+    // Also query the unified pool for any on-chain registered tokens
+    if (UNIFIED_POOL_ADDRESS) {
+      try {
+        const { UNIFIED_SHIELDED_POOL_ABI } = await import("@/lib/zktoken/abi/unified-shielded-pool");
+        const pool = new Contract(UNIFIED_POOL_ADDRESS, UNIFIED_SHIELDED_POOL_ABI as never, rpcProvider);
+        const count = Number(await pool.getAllowedTokenCount());
+        for (let i = 0; i < count; i++) {
+          const addr: string = await pool.getAllowedToken(i);
+          addAddr(addr);
         }
+      } catch { /* ignore */ }
+    }
+
+    const results: WalletToken[] = [];
+    await Promise.all(
+      addresses.map(async (tokenAddr) => {
+        try {
+          const erc20 = new Contract(tokenAddr, TEST_TOKEN_ABI, rpcProvider as never);
+          const [rawBalance, decimals, symbol] = await Promise.all([
+            erc20.balanceOf(address) as Promise<bigint>,
+            erc20.decimals().then(Number),
+            erc20.symbol() as Promise<string>,
+          ]);
+          if (rawBalance > 0n) {
+            results.push({ address: tokenAddr, symbol, decimals, balance: rawBalance, formatted: formatUnits(rawBalance, decimals) });
+          }
+        } catch { /* skip */ }
       })
     );
-    setWalletBalances(results);
-  }, [address, provider, tokens]);
+
+    // Deduplicate by address (case-insensitive)
+    const unique = new Map<string, WalletToken>();
+    for (const r of results) {
+      unique.set(r.address.toLowerCase(), r);
+    }
+    const deduped = [...unique.values()];
+    deduped.sort((a, b) => a.symbol.localeCompare(b.symbol));
+    setWalletTokens(deduped);
+    setLoadingTokens(false);
+  }, [address, provider, tokens, isUnified]);
+
+  useEffect(() => { discoverWalletTokens(); }, [discoverWalletTokens]);
+
+  // ── Selected token for unified pool (local state) ──────────────────
+  const [selectedAddr, setSelectedAddr] = useState<string>("");
 
   useEffect(() => {
-    fetchWalletBalances();
-  }, [fetchWalletBalances]);
+    if (walletTokens.length > 0 && !walletTokens.find((t) => t.address.toLowerCase() === selectedAddr.toLowerCase())) {
+      setSelectedAddr(walletTokens[0].address.toLowerCase());
+    }
+  }, [walletTokens, selectedAddr]);
+
+  const selectedWalletToken = walletTokens.find(
+    (t) => t.address.toLowerCase() === selectedAddr.toLowerCase()
+  );
+
+  // ── Effective token symbol (unified = wallet selection, V1 = fixed) ─
+  const tokenSymbol = isUnified ? (selectedWalletToken?.symbol ?? "Token") : v1Symbol;
+
+  // ── Amount state ───────────────────────────────────────────────────
+  const [amount, setAmount] = useState("");
   const [status, setStatus] = useState<string | null>(null);
-  const [useRelay, setUseRelay] = useState(false);
+  const [recovering, setRecovering] = useState(false);
+  const [useNativeAvax, setUseNativeAvax] = useState(false);
 
   const ROUND_AMOUNTS = ["100", "500", "1000", "5000", "10000"];
 
@@ -137,34 +142,17 @@ export function DepositForm() {
     amount.trim() !== "" &&
     /^\d+$/.test(amount.trim()) &&
     !ROUND_AMOUNTS.includes(amount.trim());
-  const [recovering, setRecovering] = useState(false);
-  const [useNativeAvax, setUseNativeAvax] = useState(false);
 
-  // Relay mode is available when MetaTxRelayer is configured
-  const relayAvailable = !!META_TX_RELAYER_ADDRESS;
-
-  // Compute fee for display
-  const parsedAmount = useMemo(() => {
-    const trimmed = amount.trim();
-    if (!trimmed || !/^\d+$/.test(trimmed)) return 0n;
-    return BigInt(trimmed);
-  }, [amount]);
-
-  const relayFee = useMemo(() => {
-    if (parsedAmount <= 0n) return 0n;
-    return computeFee(parsedAmount);
-  }, [parsedAmount]);
-
-  // Detect if the active token is WAVAX
-  const isWavaxPool = useMemo(() => {
-    if (!TOKEN_ADDRESS) return false;
-    const wavax = getWavaxAddress();
-    return TOKEN_ADDRESS.toLowerCase() === wavax.toLowerCase();
-  }, [TOKEN_ADDRESS]);
-
-  // Count notes that are stuck pending finalization
   const pendingNotes = notes.filter((n) => n.leafIndex < 0);
 
+  // Detect WAVAX for V1 pools
+  const isWavaxPool = useMemo(() => {
+    if (isUnified || !v1TokenAddress) return false;
+    const wavax = getWavaxAddress();
+    return v1TokenAddress.toLowerCase() === wavax.toLowerCase();
+  }, [isUnified, v1TokenAddress]);
+
+  // ── Deposit handler ────────────────────────────────────────────────
   const handleDeposit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!ready || !signer || !address) return;
@@ -184,121 +172,88 @@ export function DepositForm() {
         if (!kp) throw new Error("Failed to derive shielded key");
       }
 
-      // ── Relay deposit path ──────────────────────────────────────────────
-      if (useRelay && META_TX_RELAYER_ADDRESS) {
-        setStatus("Preparing relayed deposit...");
+      if (isUnified) {
+        // ── Unified pool path ──────────────────────────────────────────
+        if (!selectedWalletToken) { setStatus("Error: select a token"); return; }
+        if (!UNIFIED_POOL_ADDRESS) { setStatus("Error: unified pool not configured"); return; }
 
-        const { relayDeposit, waitForRelayDeposit } = await import("@/lib/zktoken/transaction");
-        const fee = computeFee(BigInt(trimmed));
-
-        setStatus("Checking token approval for relayer (one-time approval may require a small AVAX gas fee)...");
-        const result = await relayDeposit({
-          signer: signer as never,
-          provider: provider! as never,
-          poolAddress: POOL_ADDRESS,
-          tokenAddress: TOKEN_ADDRESS,
-          amount: BigInt(trimmed),
-          ownerPublicKey: kp.publicKey,
-          fee,
-          metaTxRelayerAddress: META_TX_RELAYER_ADDRESS,
-        });
-
-        setStatus(`Deposit submitted via relay: ${result.relay.txHash}. Finalizing note...`);
-
-        const finalizedNote = await waitForRelayDeposit(
-          result.relay,
-          result.pendingNote,
-          provider! as never,
-          POOL_ADDRESS
-        );
-        saveNote(finalizedNote);
-
-        setStatus(`Deposit confirmed! Leaf #${finalizedNote.leafIndex} — ready to transfer. (Fee: ${fee} ${tokenSymbol})`);
-        setAmount("");
-        return;
-      }
-
-      // ── Unified pool deposit path ────────────────────────────────────────
-      if (selectedToken?.poolType === "unified") {
-        setStatus("Depositing into unified shielded pool...");
         const { depositUnified, waitForUnifiedDeposit } = await import("@/lib/zktoken/transaction");
 
         setStatus("Approve the token transfer in your wallet...");
         const result = await depositUnified({
           signer: signer as never,
-          poolAddress: POOL_ADDRESS,
-          tokenAddress: TOKEN_ADDRESS,
+          poolAddress: UNIFIED_POOL_ADDRESS,
+          tokenAddress: selectedWalletToken.address,
           amount: BigInt(trimmed),
           ownerPublicKey: kp.publicKey,
         });
 
         setStatus(`Deposit submitted: ${result.tx.hash}. Waiting for confirmation...`);
-
         const finalizedNote = await waitForUnifiedDeposit(
-          result.tx,
-          result.pendingNote,
-          provider! as never,
-          POOL_ADDRESS
+          result.tx, result.pendingNote, provider! as never, UNIFIED_POOL_ADDRESS
         );
         saveNote(finalizedNote);
 
         setStatus(`Deposit confirmed! Leaf #${finalizedNote.leafIndex} — ready to transfer.`);
         setAmount("");
-        return;
+        await discoverWalletTokens();
+      } else {
+        // ── V1 pool path ───────────────────────────────────────────────
+        // Wrap native AVAX if needed
+        if (isWavaxPool && useNativeAvax) {
+          setStatus("Wrapping native AVAX to WAVAX...");
+          const wavaxContract = new Contract(v1TokenAddress, WAVAX_ABI, signer);
+          const amountScale = activeToken?.decimals ?? 18;
+          const wrapValue = BigInt(trimmed) * (10n ** BigInt(amountScale));
+          const wrapTx = await wavaxContract.deposit({ value: wrapValue });
+          await wrapTx.wait();
+          setStatus("AVAX wrapped. Now depositing into shielded pool...");
+        }
+
+        const { deposit, waitForDeposit } = await import("@/lib/zktoken/transaction");
+
+        setStatus("Approve the token transfer in your wallet...");
+        const result = await deposit({
+          signer: signer as never,
+          poolAddress: v1PoolAddress,
+          tokenAddress: v1TokenAddress,
+          amount: BigInt(trimmed),
+          ownerPublicKey: kp.publicKey,
+        });
+
+        setStatus(`Deposit submitted: ${result.tx.hash}. Waiting for confirmation...`);
+        const finalizedNote = await waitForDeposit(
+          result.tx, result.pendingNote, provider! as never, v1PoolAddress
+        );
+        saveNote(finalizedNote);
+
+        setStatus(`Deposit confirmed! Leaf #${finalizedNote.leafIndex} — ready to transfer.`);
+        setAmount("");
       }
-
-      // ── Direct deposit path (existing flow) ─────────────────────────────
-      // If depositing native AVAX into a WAVAX pool, wrap first
-      if (isWavaxPool && useNativeAvax) {
-        setStatus("Wrapping native AVAX to WAVAX...");
-        const wavaxContract = new Contract(TOKEN_ADDRESS, WAVAX_ABI, signer);
-        const amountScale = selectedToken?.decimals ?? 18;
-        const wrapValue = BigInt(trimmed) * (10n ** BigInt(amountScale));
-        const wrapTx = await wavaxContract.deposit({ value: wrapValue });
-        await wrapTx.wait();
-        setStatus("AVAX wrapped to WAVAX. Now depositing into shielded pool...");
-      }
-
-      const { deposit, waitForDeposit } = await import("@/lib/zktoken/transaction");
-
-      setStatus("Approve the token transfer in your wallet...");
-      const result = await deposit({
-        signer: signer as never,
-        poolAddress: POOL_ADDRESS,
-        tokenAddress: TOKEN_ADDRESS,
-        amount: BigInt(trimmed),
-        ownerPublicKey: kp.publicKey,
-      });
-
-      setStatus(`Deposit submitted: ${result.tx.hash}. Waiting for confirmation...`);
-
-      const finalizedNote = await waitForDeposit(
-        result.tx,
-        result.pendingNote,
-        provider! as never,
-        POOL_ADDRESS
-      );
-      saveNote(finalizedNote);
-
-      setStatus(`Deposit confirmed! Leaf #${finalizedNote.leafIndex} — ready to transfer.`);
-      setAmount("");
     } catch (err) {
       setStatus(`Error: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
-  // Recovery: sync the full Merkle tree and find leaf indices for stuck notes.
+  // ── Recovery ───────────────────────────────────────────────────────
   const handleRecoverNotes = async () => {
     if (!provider || pendingNotes.length === 0) return;
     setRecovering(true);
+    const poolAddr = isUnified ? UNIFIED_POOL_ADDRESS : v1PoolAddress;
     setStatus(`Syncing Merkle tree to recover ${pendingNotes.length} unfinalized note(s)...`);
 
     try {
       const { MerkleTreeSync } = await import("@/lib/zktoken/merkle");
       const { finaliseNote } = await import("@/lib/zktoken/note");
 
-      const tree = new MerkleTreeSync();
-      await tree.syncFromChain(provider as never, POOL_ADDRESS);
+      const depth = isUnified ? 24 : 20;
+      const tree = new MerkleTreeSync(depth);
+      if (isUnified) {
+        const { UNIFIED_SHIELDED_POOL_ABI } = await import("@/lib/zktoken/abi/unified-shielded-pool");
+        await tree.syncFromChain(provider as never, poolAddr, undefined, UNIFIED_SHIELDED_POOL_ABI as never);
+      } else {
+        await tree.syncFromChain(provider as never, poolAddr);
+      }
 
       setStatus(`Tree synced (${tree.size} leaves). Matching commitments...`);
 
@@ -324,14 +279,15 @@ export function DepositForm() {
     }
   };
 
+  // ── Render ─────────────────────────────────────────────────────────
   return (
     <form onSubmit={handleDeposit} className="space-y-4">
-      {/* Wallet status — deposits require an external wallet for ERC20 transfers */}
+      {/* Wallet connection */}
       <div className="rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] p-4">
         {address ? (
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-[#888888]">External Wallet (for deposits)</p>
+              <p className="text-xs text-[#888888]">Connected Wallet</p>
               <p className="text-sm font-mono text-[#acf901]">
                 {address.slice(0, 6)}...{address.slice(-4)}
               </p>
@@ -347,7 +303,7 @@ export function DepositForm() {
         ) : (
           <div className="space-y-3">
             <p className="text-sm text-[#888888]">
-              Connect an external wallet (MetaMask) to transfer ERC20 tokens into the shielded pool.
+              Connect your wallet to deposit tokens into the shielded pool.
             </p>
             <button
               type="button"
@@ -361,113 +317,75 @@ export function DepositForm() {
         )}
       </div>
 
-      {/* Pool selector */}
-      {distinctPools.length > 0 && (
-        <div>
-          <label className="block text-sm font-medium text-[#888888] mb-1">
-            Pool
-          </label>
-          <CustomSelect
-            value={selectedPoolAddr}
-            options={distinctPools.map((p) => ({
-              value: p.pool.toLowerCase(),
-              label: p.label,
-            }))}
-            onChange={handlePoolChange}
-            placeholder="Select pool..."
-          />
-        </div>
-      )}
-
-      {/* Token selector — shown when the selected pool supports multiple tokens */}
-      {poolTokens.length > 1 && (
+      {/* Token selector — only for unified pool (wallet token scan) */}
+      {isUnified && address && (
         <div>
           <label className="block text-sm font-medium text-[#888888] mb-1">
             Token
           </label>
-          <CustomSelect
-            value={selectedToken?.token.toLowerCase() ?? ""}
-            options={poolTokens.map((t) => {
-              const bal = walletBalances[t.token.toLowerCase()];
-              const balStr = bal !== undefined
-                ? ` — ${Number(bal).toLocaleString(undefined, { maximumFractionDigits: 4 })}`
-                : "";
-              return { value: t.token.toLowerCase(), label: `${t.symbol}${balStr}` };
-            })}
-            onChange={(val) => {
-              const t = poolTokens.find((t) => t.token.toLowerCase() === val);
-              if (t) setSelectedToken(t);
-              // Intentionally not calling setActiveToken — pool stays fixed in navbar
-            }}
-            placeholder="Select token..."
-          />
-        </div>
-      )}
-
-      {/* Relay mode toggle — only shown when MetaTxRelayer is configured */}
-      {relayAvailable && (
-        <div>
-          <label className="block text-sm font-medium text-[#888888] mb-1">
-            Gas Payment
-          </label>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setUseRelay(false)}
-              className={toggleBtn(!useRelay)}
-            >
-              Pay Gas (AVAX)
-            </button>
-            <button
-              type="button"
-              onClick={() => setUseRelay(true)}
-              className={toggleBtn(useRelay)}
-            >
-              Gasless (Token Fee)
-            </button>
-          </div>
-          {useRelay && (
-            <p className="mt-1 text-xs text-[#666666]">
-              A small fee in {tokenSymbol} covers gas. You need zero AVAX.
-              One-time token approval may be required.
-            </p>
+          {loadingTokens ? (
+            <p className="text-sm text-[#444444]">Scanning wallet...</p>
+          ) : walletTokens.length === 0 ? (
+            <p className="text-sm text-[#444444]">No tokens found in wallet. Use the faucet to get test tokens.</p>
+          ) : (
+            <CustomSelect
+              value={selectedAddr}
+              options={(() => {
+                // Detect duplicate symbols to disambiguate with address snippet
+                const symbolCount = new Map<string, number>();
+                for (const t of walletTokens) {
+                  symbolCount.set(t.symbol, (symbolCount.get(t.symbol) ?? 0) + 1);
+                }
+                return walletTokens.map((t) => {
+                  const hasDup = (symbolCount.get(t.symbol) ?? 0) > 1;
+                  const addrTag = hasDup ? ` (${t.address.slice(0, 6)}…${t.address.slice(-4)})` : "";
+                  return {
+                    value: t.address.toLowerCase(),
+                    label: `${t.symbol}${addrTag} — ${Number(t.formatted).toLocaleString(undefined, { maximumFractionDigits: 4 })}`,
+                  };
+                });
+              })()}
+              onChange={(val) => setSelectedAddr(val)}
+              placeholder="Select token..."
+            />
           )}
         </div>
       )}
 
-      {/* AVAX / WAVAX toggle — only shown when active pool is WAVAX and not using relay */}
-      {isWavaxPool && !useRelay && (
+      {/* V1 pool: fixed token display */}
+      {!isUnified && address && (
+        <div className="rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] p-3">
+          <p className="text-xs text-[#888888]">Depositing into</p>
+          <p className="text-sm text-[#acf901] font-medium">{v1Symbol} Pool</p>
+        </div>
+      )}
+
+      {/* AVAX / WAVAX toggle — V1 WAVAX pools only */}
+      {!isUnified && isWavaxPool && (
         <div>
           <label className="block text-sm font-medium text-[#888888] mb-1">
             Deposit From
           </label>
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setUseNativeAvax(true)}
-              className={toggleBtn(useNativeAvax)}
-            >
+            <button type="button" onClick={() => setUseNativeAvax(true)} className={toggleBtn(useNativeAvax)}>
               Native AVAX
             </button>
-            <button
-              type="button"
-              onClick={() => setUseNativeAvax(false)}
-              className={toggleBtn(!useNativeAvax)}
-            >
+            <button type="button" onClick={() => setUseNativeAvax(false)} className={toggleBtn(!useNativeAvax)}>
               WAVAX (ERC20)
             </button>
           </div>
           {useNativeAvax && (
             <p className="mt-1 text-xs text-[#666666]">
-              Your native AVAX will be automatically wrapped to WAVAX, then deposited into the shielded pool.
+              Your native AVAX will be automatically wrapped to WAVAX, then deposited.
             </p>
           )}
         </div>
       )}
 
+      {/* Amount input */}
       <div>
         <label className="block text-sm font-medium text-[#888888] mb-1">
-          Amount ({isWavaxPool && useNativeAvax && !useRelay ? "AVAX" : tokenSymbol})
+          Amount ({!isUnified && isWavaxPool && useNativeAvax ? "AVAX" : tokenSymbol})
         </label>
         <input
           type="text"
@@ -494,48 +412,30 @@ export function DepositForm() {
         </div>
         {isNonRoundAmount && (
           <p className="mt-2 text-xs text-yellow-500/90">
-            Non-round amounts reduce privacy. If someone deposits 7,342 and
-            later 7,342 is withdrawn, observers can link them. Use a round
-            denomination for stronger anonymity.
+            Non-round amounts reduce privacy. Use a round denomination for stronger anonymity.
           </p>
         )}
       </div>
 
-      {/* Relay fee breakdown */}
-      {useRelay && parsedAmount > 0n && (
-        <div className="rounded-lg border border-[#2a2a2a] bg-[#0d0d0d] p-3 space-y-1">
-          <div className="flex justify-between text-sm">
-            <span className="text-[#888888]">Deposit amount</span>
-            <span className="text-[#acf901]">{parsedAmount.toString()} {tokenSymbol}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-[#888888]">Relay fee (0.1%)</span>
-            <span className="text-[#acf901]">{relayFee.toString()} {tokenSymbol}</span>
-          </div>
-          <div className="border-t border-[#2a2a2a] pt-1 flex justify-between text-sm font-medium">
-            <span className="text-[#888888]">Total deducted</span>
-            <span className="text-[#acf901]">{(parsedAmount + relayFee).toString()} {tokenSymbol}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-[#888888]">You receive in pool</span>
-            <span className="text-[#acf901]">{parsedAmount.toString()} {tokenSymbol}</span>
-          </div>
-        </div>
-      )}
-
-      <button type="submit" disabled={!ready || !address || !keypair} className={btnPrimary}>
+      <button
+        type="submit"
+        disabled={!ready || !address || !keypair || (isUnified && !selectedWalletToken)}
+        className={btnPrimary}
+      >
         {!address
           ? "Connect wallet first"
           : !ready
           ? "Initializing..."
-          : useRelay
-          ? "Deposit via Relay (Gasless)"
+          : isUnified && !selectedWalletToken
+          ? "Select a token"
+          : isUnified
+          ? `Deposit ${tokenSymbol}`
           : isWavaxPool && useNativeAvax
           ? "Wrap AVAX & Deposit"
-          : "Deposit"}
+          : `Deposit ${v1Symbol}`}
       </button>
 
-      {/* Recovery button — only shown when there are stuck notes */}
+      {/* Recovery button */}
       {pendingNotes.length > 0 && provider && (
         <button
           type="button"
