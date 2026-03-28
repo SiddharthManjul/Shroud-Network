@@ -110,7 +110,7 @@ export function TransferForm() {
       const pendingId = createTransferPendingTx(selectedNote, POOL_ADDRESS);
 
       setStatus("Generating ZK proof (this may take a moment)...");
-      const poolConfig = activeToken ? getPoolConfig(activeToken) : null;
+      const poolConfig = activeToken ? getPoolConfig(activeToken, selectedNote.assetId) : null;
 
       let result;
       try {
