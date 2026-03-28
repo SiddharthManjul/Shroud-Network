@@ -70,7 +70,8 @@ contract UnifiedShieldedPool {
         uint256 amount,
         address indexed token,
         uint256 assetId,
-        uint256 timestamp
+        uint256 timestamp,
+        bytes encryptedMemo
     );
 
     /// @notice Emitted when a private transfer occurs inside the pool
@@ -105,6 +106,11 @@ contract UnifiedShieldedPool {
     IUnifiedWithdrawVerifier public immutable withdrawVerifier;
     IPoseidonT2 public immutable poseidonT2;
 
+    /// @notice Scaling factor = 10^decimals of wrapped ERC20 tokens.
+    ///         deposit(amount) transfers amount * amountScale raw ERC20 wei.
+    ///         Notes and circuits work with the unscaled integer amount.
+    uint256 public immutable amountScale;
+
     IncrementalMerkleTreeV2.TreeData internal tree;
 
     mapping(uint256 => bool) public spentNullifiers;
@@ -121,21 +127,25 @@ contract UnifiedShieldedPool {
     /// @param _withdrawVerifier  Deployed UnifiedWithdrawVerifier
     /// @param _poseidonT2        Deployed Poseidon(1) contract for asset_id
     /// @param _poseidonT3        Deployed Poseidon(2) contract for Merkle tree
+    /// @param _amountScale       Scaling factor = 10^decimals (e.g. 1e18 for 18-decimal tokens)
     constructor(
         address _transferVerifier,
         address _withdrawVerifier,
         address _poseidonT2,
-        address _poseidonT3
+        address _poseidonT3,
+        uint256 _amountScale
     ) {
         require(_transferVerifier != address(0), "USP: zero transfer verifier");
         require(_withdrawVerifier != address(0), "USP: zero withdraw verifier");
         require(_poseidonT2 != address(0), "USP: zero poseidonT2");
         require(_poseidonT3 != address(0), "USP: zero poseidonT3");
+        require(_amountScale > 0, "USP: zero scale");
 
         owner = msg.sender;
         transferVerifier = IUnifiedTransferVerifier(_transferVerifier);
         withdrawVerifier = IUnifiedWithdrawVerifier(_withdrawVerifier);
         poseidonT2 = IPoseidonT2(_poseidonT2);
+        amountScale = _amountScale;
         tree.init(_poseidonT3);
     }
 
@@ -179,17 +189,28 @@ contract UnifiedShieldedPool {
 
     /// @notice Deposit ERC20 tokens into the shielded pool
     /// @param token          ERC20 token to deposit
-    /// @param amount         Amount to deposit
+    /// @param amount         Unscaled amount (e.g. 500 for 500 tokens). Contract scales by amountScale.
     /// @param noteCommitment V2 note commitment (includes asset_id)
+    /// @param encryptedMemo  Self-encrypted note data (ECDH + AES-256-GCM) for recovery
     function deposit(
         address token,
         uint256 amount,
-        uint256 noteCommitment
+        uint256 noteCommitment,
+        bytes calldata encryptedMemo
     ) external {
-        if (!allowedTokens[token]) revert TokenNotAllowed(token);
+        if (token == address(0)) revert ZeroAddress();
         if (amount == 0) revert ZeroAmount();
 
-        bool success = IERC20Unified(token).transferFrom(msg.sender, address(this), amount);
+        // Auto-register token on first deposit (permissionless)
+        if (!allowedTokens[token]) {
+            allowedTokens[token] = true;
+            uint256 assetId = poseidonT2.poseidon([uint256(uint160(token))]);
+            tokenAssetId[token] = assetId;
+            allowedTokenList.push(token);
+            emit TokenAdded(token, assetId);
+        }
+
+        bool success = IERC20Unified(token).transferFrom(msg.sender, address(this), amount * amountScale);
         require(success, "ERC20 transfer failed");
 
         (uint32 leafIndex, ) = tree.insert(noteCommitment);
@@ -201,7 +222,8 @@ contract UnifiedShieldedPool {
             amount,
             token,
             tokenAssetId[token],
-            block.timestamp
+            block.timestamp,
+            encryptedMemo
         );
     }
 
@@ -287,7 +309,7 @@ contract UnifiedShieldedPool {
         }
 
         poolBalance[token] -= amount;
-        bool success = IERC20Unified(token).transfer(recipient, amount);
+        bool success = IERC20Unified(token).transfer(recipient, amount * amountScale);
         require(success, "ERC20 transfer failed");
 
         emit Withdrawal(
