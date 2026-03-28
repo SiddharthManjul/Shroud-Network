@@ -93,7 +93,7 @@ export function TokenProvider({ children }: { children: ReactNode }) {
         try {
           const unifiedPool = new Contract(
             unifiedPoolAddress,
-            UNIFIED_SHIELDED_POOL_ABI as readonly unknown[],
+            UNIFIED_SHIELDED_POOL_ABI as never,
             readProviderRef.current!
           );
           const tokenCount = Number(await unifiedPool.getAllowedTokenCount());
